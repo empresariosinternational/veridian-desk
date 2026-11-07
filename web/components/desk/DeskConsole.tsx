@@ -4,20 +4,21 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import VeridianMark from "@/components/VeridianMark";
 import { SCRIPT } from "@/lib/desk/fallback";
 import { fmtTime } from "@/lib/desk/time";
+import { cancelSpeech, canSpeak, captureSpeech, speakInBrowser, speechRecognition, type VoiceCapture } from "@/lib/desk/browser-voice";
 import type { DeskPayload } from "@/lib/desk/payload";
 import type { FunderView } from "@/lib/desk/privacy";
-import type { AssistantMode, AssistantMessage, BoardId, CardRef, ExecutiveTask, HearOutcome, OrgId, ProfileId } from "@/lib/desk/types";
+import type { AssistantMode, AssistantMessage, BoardId, CardRef, ExecutiveTask, HearOutcome, Lang, OrgId, ProfileId } from "@/lib/desk/types";
 import DeskAssistant from "./DeskAssistant";
+import ArduinoNode from "./ArduinoNode";
 import { Board, type BoardCtx, type SentenceCheck } from "./DeskBoards";
 import css from "./DeskConsole.module.css";
 
-type Voice = { heard: string; spoke: string; notice: string | null; via: string };
+type Voice = { via: string };
 
 type HearResponse = Partial<DeskPayload> & {
   ok: boolean;
   outcome?: HearOutcome;
   transcript?: string;
-  speech?: { audioBase64: string; mimeType: string } | null;
   voice?: Voice;
   notice?: string | null;
   assistant?: { status: "live" | "fallback"; reply: string; tasks: ExecutiveTask[] };
@@ -35,23 +36,6 @@ const ALL_BOARDS = ["calls", "donors", "workshops", "notes", "staffing", "recrui
 
 const CLOSE_LINE = "Said once. Filed once. The right person and the other community answered the same day.";
 
-function pickMime(): string | undefined {
-  if (typeof MediaRecorder === "undefined") return undefined;
-  for (const m of ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"]) {
-    if (MediaRecorder.isTypeSupported(m)) return m;
-  }
-  return undefined;
-}
-
-function blobToBase64(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const r = new FileReader();
-    r.onload = () => resolve(String(r.result).split(",")[1] ?? "");
-    r.onerror = () => reject(r.error);
-    r.readAsDataURL(blob);
-  });
-}
-
 export default function DeskConsole() {
   const [data, setData] = useState<DeskPayload | null>(null);
   const [offline, setOffline] = useState(false);
@@ -62,20 +46,62 @@ export default function DeskConsole() {
   const [funderOn, setFunderOn] = useState(false);
   const [funder, setFunder] = useState<FunderView | null>(null);
   const [recording, setRecording] = useState(false);
+  const [captureSource, setCaptureSource] = useState<"manual" | "sonar" | null>(null);
+  const [finishingVoice, setFinishingVoice] = useState(false);
+  const [browserVoice, setBrowserVoice] = useState({ recognition: false, playback: false });
+  const [voiceLanguage, setVoiceLanguage] = useState("en-US");
   const [hotCards, setHotCards] = useState<CardRef[]>([]);
   const [resetArmed, setResetArmed] = useState(false);
   const [done, setDone] = useState<Set<string>>(new Set());
   const [assistantEpoch, setAssistantEpoch] = useState(0);
 
   const lastWrite = useRef(0);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const rec = useRef<{ rec: MediaRecorder; chunks: Blob[]; stream: MediaStream; started: number } | null>(null);
+  const spokenRef = useRef<{ text: string; lang: Lang } | null>(null);
+  const rec = useRef<VoiceCapture | null>(null);
+  const voiceTurn = useRef(0);
   const holding = useRef(false);
+  const captureSourceRef = useRef<"manual" | "sonar" | null>(null);
+  const captureTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const finishingCapture = useRef(false);
+  const stopTalkRef = useRef<() => void>(() => undefined);
 
   const flash = useCallback((msg: string) => {
     setToast(msg);
     window.setTimeout(() => setToast((t) => (t === msg ? null : t)), 2800);
   }, []);
+
+  const cancelTalk = useCallback(() => {
+    holding.current = false;
+    if (captureTimer.current) clearTimeout(captureTimer.current);
+    captureTimer.current = null;
+    finishingCapture.current = false;
+    voiceTurn.current++;
+    rec.current?.abort();
+    rec.current = null;
+    setRecording(false);
+    captureSourceRef.current = null;
+    setCaptureSource(null);
+    setFinishingVoice(false);
+    cancelSpeech();
+  }, []);
+
+  useEffect(() => {
+    setBrowserVoice({ recognition: Boolean(speechRecognition()), playback: canSpeak() });
+    const onBlur = () => cancelTalk();
+    window.addEventListener("blur", onBlur);
+    return () => {
+      window.removeEventListener("blur", onBlur);
+      if (captureTimer.current) clearTimeout(captureTimer.current);
+      voiceTurn.current++;
+      rec.current?.abort();
+      rec.current = null;
+      cancelSpeech();
+    };
+  }, [cancelTalk]);
+
+  useEffect(() => {
+    if (data && (!data.node.armed || offline) && rec.current) cancelTalk();
+  }, [data?.node.armed, offline, cancelTalk]);
 
   const apply = useCallback((j: Partial<DeskPayload>) => {
     if (j && j.state && j.node) {
@@ -84,13 +110,14 @@ export default function DeskConsole() {
     }
   }, []);
 
-  // Poll the desk (and the physical node's button) every 1.5 s.
+  // Poll the desk every 1.5 s. Arduino communicates directly over USB.
   useEffect(() => {
     let alive = true;
     const tick = async () => {
       const startedAt = Date.now();
       try {
         const r = await fetch("/api/desk/state", { cache: "no-store" });
+        if (!r.ok) throw new Error("Desk server unavailable");
         const j = (await r.json()) as DeskPayload;
         if (alive && r.ok && startedAt >= lastWrite.current) {
           setData(j);
@@ -152,10 +179,11 @@ export default function DeskConsole() {
   }, []);
 
   const hear = useCallback(
-    async (payload: { text?: string; audioBase64?: string; mimeType?: string; source?: "script" | "typed"; mode?: AssistantMode; messages?: AssistantMessage[] }): Promise<HearResponse | null> => {
+    async (payload: { text: string; source?: "script" | "typed" | "voice"; lang?: Lang; mode?: AssistantMode; messages?: AssistantMessage[] }): Promise<HearResponse | null> => {
       setBusy("hear");
-      audioRef.current?.pause();
-      audioRef.current = null;
+      const playbackTurn = voiceTurn.current;
+      cancelSpeech();
+      spokenRef.current = null;
       const j = await post<HearResponse>("/api/desk/hear", { ...payload, profileHint: active });
       setBusy(null);
       if (!j) return null;
@@ -166,10 +194,10 @@ export default function DeskConsole() {
         showCards(j.outcome.cards);
         if (j.outcome.scriptId) setDone((d) => new Set(d).add(j.outcome!.scriptId!));
       } else if (j.notice) flash(j.notice);
-      if (j.speech?.audioBase64) {
-        const a = new Audio(`data:${j.speech.mimeType};base64,${j.speech.audioBase64}`);
-        audioRef.current = a;
-        a.play().catch(() => undefined);
+      if (j.outcome?.ok && j.outcome.spoken && payload.source !== "typed" && playbackTurn === voiceTurn.current) {
+        spokenRef.current = { text: j.outcome.spoken, lang: j.outcome.lang };
+        const failed = () => flash("Browser speech playback is unavailable. The confirmation is shown below.");
+        if (!speakInBrowser(j.outcome.spoken, j.outcome.lang, failed)) failed();
       }
       return j;
     },
@@ -178,53 +206,72 @@ export default function DeskConsole() {
 
   const nodeEvent = useCallback(
     async (event: "arm" | "disarm" | "presence") => {
+      if (event === "disarm") cancelTalk();
       const j = await post<Partial<DeskPayload>>("/api/desk/node", { event });
       if (j) apply(j);
     },
-    [apply, post],
+    [apply, post, cancelTalk],
   );
 
-  // Push-to-talk: the mic opens only while the button is held, after Arm.
-  const startTalk = useCallback(async () => {
-    holding.current = true;
-    if (rec.current || !data) return;
-    if (!data.voiceReady.key) return flash("OpenAI key missing — type a note or use a demo line");
+  // Both modes require Arm. Sonar captures one clip lasting up to eight seconds.
+  const startTalk = useCallback((source: "manual" | "sonar" = "manual") => {
+    if (rec.current || finishingCapture.current || busy || !data) return;
     if (!data.node.armed) return flash("Arm the desk first — consent comes before the mic.");
+    holding.current = true;
+    captureSourceRef.current = source;
+    setCaptureSource(source);
+    cancelSpeech();
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      if (!holding.current) {
-        stream.getTracks().forEach((t) => t.stop());
-        return;
-      }
-      const mime = pickMime();
-      const r = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
-      const chunks: Blob[] = [];
-      r.ondataavailable = (e) => {
-        if (e.data.size) chunks.push(e.data);
-      };
-      r.start();
-      rec.current = { rec: r, chunks, stream, started: Date.now() };
+      const capture = captureSpeech(voiceLanguage);
+      rec.current = capture;
       setRecording(true);
-    } catch {
-      flash("Microphone blocked — allow it in the browser, or use a scripted line.");
+      if (source === "sonar") captureTimer.current = setTimeout(() => stopTalkRef.current(), 8000);
+      void capture.result.then((result) => {
+        if (rec.current !== capture) return;
+        setRecording(false);
+        if (result.error) {
+          rec.current = null;
+          holding.current = false;
+          captureSourceRef.current = null;
+          setCaptureSource(null);
+          if (captureTimer.current) clearTimeout(captureTimer.current);
+          captureTimer.current = null;
+          flash(result.error);
+        } else if (source === "sonar") stopTalkRef.current();
+      });
+    } catch (error) {
+      holding.current = false;
+      captureSourceRef.current = null;
+      setCaptureSource(null);
+      flash((error as Error).message);
     }
-  }, [data, flash]);
+  }, [busy, data, flash, voiceLanguage]);
 
   const stopTalk = useCallback(async () => {
     holding.current = false;
+    if (captureTimer.current) clearTimeout(captureTimer.current);
+    captureTimer.current = null;
     const cur = rec.current;
-    if (!cur) return;
-    rec.current = null;
+    if (!cur || finishingCapture.current) return;
+    finishingCapture.current = true;
+    const turn = voiceTurn.current;
     setRecording(false);
-    await new Promise<void>((resolve) => {
-      cur.rec.onstop = () => resolve();
-      cur.rec.stop();
-    });
-    cur.stream.getTracks().forEach((t) => t.stop());
-    if (Date.now() - cur.started < 450) return flash("Hold the button while you talk.");
-    const blob = new Blob(cur.chunks, { type: cur.rec.mimeType || "audio/webm" });
-    await hear({ audioBase64: await blobToBase64(blob), mimeType: blob.type });
-  }, [flash, hear]);
+    setFinishingVoice(true);
+    cur.stop();
+    const result = await cur.result;
+    if (turn !== voiceTurn.current) return;
+    rec.current = null;
+    finishingCapture.current = false;
+    captureSourceRef.current = null;
+    setCaptureSource(null);
+    setFinishingVoice(false);
+    if (result.aborted) return;
+    if (result.error) return flash(result.error);
+    if (!result.text) return flash("Didn't hear any speech. Hold the button while you talk.");
+    await hear({ text: result.text, source: "voice", lang: voiceLanguage.startsWith("es") ? "es" : "en" });
+  }, [flash, hear, voiceLanguage]);
+
+  useEffect(() => { stopTalkRef.current = () => { void stopTalk(); }; }, [stopTalk]);
 
   const act: BoardCtx["act"] = useMemo(
     () => ({
@@ -285,6 +332,8 @@ export default function DeskConsole() {
     if (j) {
       apply(j);
       setLast(null);
+      spokenRef.current = null;
+      cancelSpeech();
       setDone(new Set());
       setAssistantEpoch((epoch) => epoch + 1);
       setActive("marisol");
@@ -306,6 +355,7 @@ export default function DeskConsole() {
   }
 
   const { state, node, voiceReady, giveMiamiDay } = data;
+  const voiceBusy = recording || finishingVoice || Boolean(rec.current);
   const profile = state.profiles[active];
   const working = busy === "hear" || node.status === "WORKING";
   const lampOn = (c: "red" | "amber" | "green" | "white") =>
@@ -331,9 +381,10 @@ export default function DeskConsole() {
             <p className={css.subtitle}>Say it once. The desk files it, routes the urgent thing, and keeps private things private.</p>
           </div>
         </div>
-        <span className={`${css.pill} ${voiceReady.key ? css.pillOk : css.pillWarn}`}>
-          {voiceReady.key ? "OpenAI GPT · ready" : "OpenAI key missing — filing uses desk rules"}
+        <span className={`${css.pill} ${browserVoice.recognition ? css.pillOk : css.pillWarn}`}>
+          {browserVoice.recognition ? "Browser voice · no key needed" : "Browser speech unavailable — type a note"}
         </span>
+        <span className={`${css.pill} ${css.pillOk}`}>{data.assistantReady.key ? "OpenAI GPT · ready" : "Desk rules · ready"}</span>
         <span className={`${css.pill} ${css.pillVeridian}`}>{giveMiamiDay.label}</span>
         {!data.persistence && <span className={`${css.pill} ${css.pillWarn}`}>running from memory</span>}
         {offline && <span className={`${css.pill} ${css.pillWarn}`}>reconnecting…</span>}
@@ -349,7 +400,7 @@ export default function DeskConsole() {
                 type="button"
                 className={`${css.chip} ${active === id ? css.chipActive : ""}`}
                 aria-pressed={active === id}
-                disabled={busy === "hear"}
+                disabled={busy === "hear" || voiceBusy}
                 onClick={() => setActive(id)}
               >
                 <strong>{state.profiles[id].name}</strong> · {state.profiles[id].role}
@@ -362,11 +413,11 @@ export default function DeskConsole() {
 
       <div className={css.grid}>
         <aside className={`${css.panel} ${css.sticky}`} aria-label="desk node">
-          <DeskAssistant key={assistantEpoch} active={active} profiles={state.profiles} busy={busy === "hear"} onSend={hear} />
+          <DeskAssistant key={assistantEpoch} active={active} profiles={state.profiles} busy={busy === "hear" || voiceBusy} onSend={hear} />
           <div className={css.row}>
             <span className={css.label}>Desk node</span>
             <span className={css.hint} style={{ marginLeft: "auto" }}>
-              on-screen node · hardware mirrors it
+              Arduino · sonar + OLED
             </span>
           </div>
           <div className={css.device}>
@@ -377,49 +428,65 @@ export default function DeskConsole() {
               <span className={`${css.lamp} ${css.lampIdle} ${lampOn("white")}`} />
             </div>
             <div className={css.oled} role="status" aria-live="polite">
-              <span className={css.oledStatus}>{working ? "WORKING" : node.status}</span>
+              <span className={css.oledStatus}>{working || finishingVoice ? "WORKING" : recording ? "LISTENING" : node.armed ? "ARMED" : node.status}</span>
               <span className={node.urgent && node.status === "IDLE" ? css.urgentText : ""}>{node.line}</span>
             </div>
           </div>
           {node.presence && <div className={css.presence}>Someone is at the desk.</div>}
           <div className={css.row}>
-            <button type="button" className={`${css.btn} ${css.btnArm}`} onClick={() => nodeEvent("arm")} disabled={working}>
+            <button type="button" className={`${css.btn} ${css.btnArm}`} onClick={() => nodeEvent("arm")} disabled={working || voiceBusy}>
               Arm
             </button>
             <button type="button" className={css.btn} onClick={() => nodeEvent("disarm")}>
               Disarm
             </button>
-            <button type="button" className={`${css.btn} ${css.btnGhost} ${css.btnSmall}`} onClick={() => nodeEvent("presence")} title="Simulates the PIR sensor">
-              PIR: someone here
-            </button>
           </div>
-          <button
-            type="button"
-            className={`${css.ptt} ${recording ? css.pttLive : ""}`}
-            disabled={!voiceReady.key || (!node.armed && !recording) || busy === "hear"}
-            onPointerDown={(e) => {
-              e.currentTarget.setPointerCapture(e.pointerId);
-              startTalk();
-            }}
-            onPointerUp={() => stopTalk()}
-            onPointerCancel={() => stopTalk()}
-            onKeyDown={(e) => {
-              if ((e.key === " " || e.key === "Enter") && !e.repeat) {
-                e.preventDefault();
+          <ArduinoNode
+            status={offline ? "OFFLINE" : working || finishingVoice ? "WORKING" : recording ? "LISTENING" : node.armed ? "ARMED" : node.status}
+            urgent={node.urgent}
+            line={offline ? "Desk server unavailable" : working || finishingVoice ? "Working" : recording ? "Listening - speak now" : node.armed ? "Wave near sonar or hold to talk" : node.lineAscii}
+            onTrigger={() => { if (!document.hidden && !offline) startTalk("sonar"); }}
+            onDisconnect={() => { if (captureSourceRef.current === "sonar") cancelTalk(); }}
+          />
+          <label className={css.hint} htmlFor="desk-voice-language">Spoken language</label>
+          <select id="desk-voice-language" className={css.input} value={voiceLanguage} onChange={(e) => setVoiceLanguage(e.target.value)} disabled={voiceBusy || busy === "hear"}>
+            <option value="en-US">English</option>
+            <option value="es-US">Español</option>
+          </select>
+          {recording && captureSource === "sonar" ? (
+            <button type="button" className={`${css.ptt} ${css.pttLive}`} onClick={() => void stopTalk()}>
+              ● Listening — stop and file
+            </button>
+          ) : (
+            <button
+              type="button"
+              className={`${css.ptt} ${recording ? css.pttLive : ""}`}
+              disabled={!browserVoice.recognition || (!node.armed && !recording) || busy === "hear" || finishingVoice}
+              onPointerDown={(e) => {
+                e.currentTarget.setPointerCapture(e.pointerId);
                 startTalk();
-              }
-            }}
-            onKeyUp={(e) => {
-              if (e.key === " " || e.key === "Enter") {
-                e.preventDefault();
-                stopTalk();
-              }
-            }}
-          >
-            {recording ? "● Listening — release to file" : node.armed ? "Hold to talk" : "Arm first, then hold to talk"}
-          </button>
+              }}
+              onPointerUp={() => stopTalk()}
+              onPointerCancel={() => cancelTalk()}
+              onBlur={() => { if (holding.current) cancelTalk(); }}
+              onKeyDown={(e) => {
+                if ((e.key === " " || e.key === "Enter") && !e.repeat) {
+                  e.preventDefault();
+                  startTalk();
+                }
+              }}
+              onKeyUp={(e) => {
+                if (e.key === " " || e.key === "Enter") {
+                  e.preventDefault();
+                  stopTalk();
+                }
+              }}
+            >
+              {recording ? "● Listening — release to file" : finishingVoice ? "Finishing transcript…" : node.armed ? "Hold to talk" : "Arm first, then hold to talk"}
+            </button>
+          )}
           <p className={css.hint}>
-            Push-to-talk only. No always-on microphone, no room recording. Audio goes to OpenAI and is not stored by the desk. Spoken confirmations use an AI-generated voice.
+            Arm, then wave near the sonar or hold to talk. Sonar recording ends after 8 seconds or when browser recognition ends; Disarm cancels it. Your browser handles speech recognition and spoken confirmations without an API key. Only the transcript goes to the desk. Your browser may use its own speech service.
             {!voiceReady.creoleLive && " Creole notes are entered by staff."}
           </p>
 
@@ -443,8 +510,11 @@ export default function DeskConsole() {
               ) : null}
               <div className={css.row}>
                 {last.voice?.via && <span className={css.hint}>{last.voice.via}</span>}
-                {audioRef.current && (
-                  <button type="button" className={`${css.btn} ${css.btnGhost} ${css.btnSmall}`} onClick={() => audioRef.current?.play().catch(() => undefined)}>
+                {spokenRef.current && browserVoice.playback && (
+                  <button type="button" className={`${css.btn} ${css.btnGhost} ${css.btnSmall}`} disabled={voiceBusy} onClick={() => {
+                    const spoken = spokenRef.current;
+                    if (spoken) speakInBrowser(spoken.text, spoken.lang, () => flash("Browser speech playback is unavailable."));
+                  }}>
                     ▶ replay
                   </button>
                 )}
@@ -460,7 +530,7 @@ export default function DeskConsole() {
                 key={l.id}
                 type="button"
                 className={`${css.scriptBtn} ${done.has(l.id) ? css.scriptDone : ""}`}
-                disabled={busy === "hear"}
+                disabled={busy === "hear" || voiceBusy}
                 onClick={() => hear({ text: l.text, source: "script" })}
               >
                 <span className={css.stepNum}>{l.step}</span>
@@ -473,7 +543,7 @@ export default function DeskConsole() {
                 </span>
               </button>
             ))}
-            <button type="button" className={css.scriptBtn} disabled={busy === "hear"} onClick={() => hear({ text: SCRIPT[0].text, source: "script" })}>
+            <button type="button" className={css.scriptBtn} disabled={busy === "hear" || voiceBusy} onClick={() => hear({ text: SCRIPT[0].text, source: "script" })}>
               <span className={css.stepNum}>↻</span>
               <span>
                 <strong>Repeat Marisol</strong>Say it again — the desk should answer “Already filed”.
@@ -481,7 +551,7 @@ export default function DeskConsole() {
             </button>
           </div>
           <div className={css.row}>
-            <button type="button" className={`${css.btn} ${css.btnGhost} ${css.btnSmall}`} onClick={reset} disabled={busy === "hear"}>
+            <button type="button" className={`${css.btn} ${css.btnGhost} ${css.btnSmall}`} onClick={reset} disabled={busy === "hear" || voiceBusy}>
               {resetArmed ? "Click again to reset the demo" : "Reset demo"}
             </button>
           </div>

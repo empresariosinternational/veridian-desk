@@ -3,7 +3,7 @@
 
 **Say it once. The desk files it, routes the urgent thing the same day, and keeps private things private.**
 
-Veridian Desk is a GPT-powered assistant for nonprofits, communities, and the people in them. Chat with the desk, plan the day's executive tasks, or say a fact once and file it. OpenAI handles chat, planning, transcription, and spoken confirmations. The desk merges duplicate donors, turns workshop requests into approval checklists, keeps counseling detail out of funder reports, and drafts grant updates from a truth ledger. The same network staffs shifts and proposes public needs for both communities to approve.
+Veridian Desk is an assistant for nonprofits, communities, and the people in them. Chat with the desk, plan the day's executive tasks, or say a fact once and file it. The browser handles microphone speech recognition and spoken confirmations with no application API key. OpenAI optionally powers GPT chat and planning. The desk merges duplicate donors, turns workshop requests into approval checklists, keeps counseling detail out of funder reports, and drafts grant updates from a truth ledger. The same network staffs shifts and proposes public needs for both communities to approve.
 
 Built at the DevDay Exchange · Codex Hackathon for Miami's Non-Profits (The LAB Miami, Nov 7–8, 2026) for the six Tidepath Family Alliance challenges and the Mangrove Mews bonus. Veridian is the assistant layer; the web app around it is Agentscene. All people, organizations, schools, donors and amounts in the demo are fictional.
 
@@ -12,19 +12,20 @@ Built at the DevDay Exchange · Codex Hackathon for Miami's Non-Profits (The LAB
 ```bash
 cd web
 npm install
-cp .env.example .env.local     # set OPENAI_API_KEY here, or export it in your shell
 npm run dev -- -H 0.0.0.0      # http://localhost:3000/desk
 npm run desk:smoke             # runs the whole demo offline and checks it
 npm run desk:test              # OpenAI integration tests using a local API fixture
 ```
 
-On Vercel, keep the project root at `web/` and set the server-side `OPENAI_API_KEY` environment variable. The same name works locally and in the hosted app. No browser key or `NEXT_PUBLIC_` key is needed. Redeploy after changing hosted environment variables.
+Voice and desk-rule filing need no key. Open `/desk`, allow microphone access, press **Arm**, then hold **Hold to talk** and release to file. Choose English or Español with **Spoken language**. A browser with Web Speech recognition is required; unsupported browsers can use typed notes and demo buttons. Browser speech services may need a network connection even though the app requires no voice key.
+
+For GPT chat and executive planning, optionally set the server-side `OPENAI_API_KEY` in your shell, `web/.env.local`, or the Vercel project environment. Keep the Vercel project root at `web/`. No browser key or `NEXT_PUBLIC_` key is needed. Redeploy after changing hosted environment variables.
 
 Open `/desk` and select a profile. **Chat** supports follow-up questions with a separate conversation per profile. **Plan my day** proposes prioritized tasks with owners, dates, and approval requirements from current desk work. **File a note** updates boards through validated tools. Chat and planning do not file notes or execute proposed tasks; existing approval controls handle offers, workshops, and network matches.
 
-Only `OPENAI_API_KEY` is required. Optional defaults in `web/.env.example` are `OPENAI_MODEL=gpt-4.1-mini`, `OPENAI_TRANSCRIBE_MODEL=gpt-transcribe`, `OPENAI_VOICE_MODEL=gpt-realtime-2.1-mini`, and `OPENAI_VOICE=marin`. The chat model must support the Responses API and Structured Outputs; the voice model must support Realtime audio output.
+The only model setting is the optional `OPENAI_MODEL=gpt-4.1-mini` override in `web/.env.example`. The GPT model must support the Responses API and Structured Outputs. Voice uses the browser's built-in speech APIs and available voices.
 
-No key or an upstream outage? Filing still uses the offline desk rules and clearly labels the fallback. Chat and planning show an error without creating records. Spoken-confirmation failures leave successfully filed work intact.
+No OpenAI key or an upstream outage? Voice still works, and filing uses the desk rules. GPT chat and planning show an error without creating records. Browser playback failures leave successfully filed work intact and the written confirmation visible.
 
 ## One desk, two sides
 
@@ -42,29 +43,29 @@ No key or an upstream outage? Filing still uses the offline desk rules and clear
 ## How it works
 
 ```
-mic (push-to-talk, after Arm) or a scripted line
-  → POST /api/desk/hear      OpenAI gpt-transcribe (text skips transcription)
+mic (push-to-talk or Arduino sonar, after Arm) → browser SpeechRecognition → transcript
+  → POST /api/desk/hear      text only (voice / typed / scripted)
   → web/lib/desk/planner.ts  GPT Responses API → validated chat / executive plan / filing actions
   → web/lib/desk/agent.ts    executes a validated filing plan, or offline rules on provider failure
   → web/lib/desk/tools.ts    plain functions file the work, keyed so nothing doubles
   → web/data/desk-state.json one JSON file; no database, no login
-  → OpenAI Realtime         speaks one short confirmation for voice/demo input
+  → browser speechSynthesis speaks one short confirmation for voice/demo input
   → /desk                    the board in front changes with the speaker
 ```
 
 - **Say it once.** Every utterance is keyed by normalized text + speaker + day, and every fact it writes has its own key, so a reworded repeat says “Already filed”.
 - **Truth ledger.** Grant and quarterly text may only carry figures that exist in the ledger (`web/lib/desk/ledger.ts`).
 - **Data classes.** `PUBLIC_COMMUNITY`, `OPERATIONAL`, `DONOR`, `CLINICAL`. Only `PUBLIC_COMMUNITY` crosses between organizations. Its text is built from structured fields and re-checked for names, counseling content, amounts and addresses (`web/lib/desk/privacy.ts`).
-- **Consent.** No always-on microphone. Audio is accepted only after Arm, while push-to-talk is held; it goes to OpenAI and is not stored by the desk. Spoken confirmations use an AI-generated voice. Matches stay pending until both orgs accept, and shift offers until the person accepts.
+- **Consent.** No always-on microphone. After Arm, browser recognition starts while push-to-talk is held or for one sonar-triggered clip of up to eight seconds. Release or **Stop and file** waits for the final transcript; Disarm cancels and discards unfiled speech. Only text goes to the desk; no audio is uploaded or stored by the app. The browser may use its own speech service. Matches stay pending until both orgs accept, and shift offers until the person accepts.
 - **Model context.** GPT receives the current request, bounded conversation history, and relevant desk work. Stored clinical notes, family records, donor emails, and gift amounts are excluded. The Responses API uses `store: false`. History stays in browser memory and is cleared by reload or demo reset.
 - **Learning, honestly.** One remembered preference: Marisol's call list grouped by school.
 - **Haitian Creole.** Live Creole audio has not been verified for this demo; staff can enter notes as text.
 
-The implementation follows the official [Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs), [file transcription](https://developers.openai.com/api/docs/guides/speech-to-text), and [Realtime conversations](https://developers.openai.com/api/docs/guides/realtime-conversations) documentation.
+The implementation follows the official [Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs) documentation and the browser [SpeechRecognition](https://developer.mozilla.org/en-US/docs/Web/API/SpeechRecognition) and [SpeechSynthesis](https://developer.mozilla.org/en-US/docs/Web/API/SpeechSynthesis) APIs.
 
 ## Hardware
 
-An optional MicroPython node (Pico W or ESP32) with parts from the SunFounder Universal Maker Sensor Kit: a button to arm, an RGB or traffic-light LED, an SSD1306 OLED, a PIR for “someone is at the desk”, and a buzzer for urgent cards. See [firmware/README.md](firmware/README.md). Without a board, the on-screen node is the device.
+An optional Arduino Uno or classic Nano connects over USB: an Adafruit SSD1306 I²C OLED (SCK/SCL **A5**, SDA **A4**), an HC-SR04 sonar (Trig **7**, Echo **6**), and a status LED (**5**). On `/desk` in desktop Chrome or Edge, choose **Connect Arduino**, then **Arm** and wave 2–20 cm from the sonar to start up to eight seconds of browser microphone capture. Disarm cancels a pending capture. Upload [firmware/desk_node/desk_node.ino](firmware/desk_node/desk_node.ino); see [firmware/README.md](firmware/README.md) for wiring, libraries and setup. Manual push-to-talk works without a board.
 
 ## Docs
 

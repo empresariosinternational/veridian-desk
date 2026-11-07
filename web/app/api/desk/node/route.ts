@@ -9,10 +9,10 @@ type NodeEvent = "arm" | "disarm" | "presence" | "button";
 
 /**
  * POST /api/desk/node { event: "arm" | "disarm" | "presence" | "button" }
- * - arm: consent → LISTENING (the mic still opens only while push-to-talk is held)
+ * - arm: consent → LISTENING window (browser push-to-talk or bounded sonar capture)
  * - disarm: IDLE, drops any unfiled audio
- * - presence: PIR — front-desk banner only, never starts the microphone
- * - button: the physical node's button toggles arm / disarm
+ * - presence: front-desk banner only, never starts the microphone
+ * - button: legacy toggle for arm / disarm; Arduino sonar events stay in the browser
  */
 export async function POST(req: Request) {
   let event: NodeEvent | undefined;

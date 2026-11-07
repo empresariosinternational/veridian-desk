@@ -4,12 +4,13 @@
  *   IDLE → ARMED (consent) → LISTENING → WORKING → FILED → IDLE
  *
  * - Arm is the consent step. It opens one capture window (LISTENING, red).
- *   The microphone itself only opens while push-to-talk is held.
- * - WORKING (amber) while OpenAI transcribes/plans and the desk files.
+ *   The browser opens its mic for push-to-talk or one bounded Arduino sonar clip.
+ * - WORKING (amber) while the desk plans and files the browser's transcript.
  * - FILED (green) for a moment, then IDLE. Raw audio is dropped at FILED.
  * - Disarm returns to IDLE from anywhere and drops any unfiled audio.
  * - An armed window that is never used expires back to IDLE.
- * - Presence (PIR) only raises a front-desk banner. It never starts capture.
+ * - Presence only raises a front-desk banner. Arduino sonar triggers stay local
+ *   to the connected browser tab and require an armed capture window.
  * - Urgent is an overlay (blink), not a status.
  */
 
@@ -120,7 +121,7 @@ export function settle(state: DeskState, now: Date): boolean {
 export type NodeView = {
   status: NodeStatus;
   line: string;
-  /** ASCII-only line for MicroPython framebuf fonts. */
+  /** ASCII-only line for the Arduino OLED font. */
   lineAscii: string;
   color: "white" | "red" | "amber" | "green";
   blink: boolean;

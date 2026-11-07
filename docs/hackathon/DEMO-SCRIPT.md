@@ -5,24 +5,23 @@ Submit on DeepStation by **Sunday, Nov 8, 4:45 PM ET**. Be in the room at **4:30
 
 ## DeepStation blurb
 
-Veridian Desk is a push-to-talk assistant for nonprofits, communities, and the people in them. Staff and neighbors say each fact once. OpenAI transcribes their speech, plans the filing actions with GPT, and speaks the confirmation. The desk files the note, merges a duplicate donor before Give Miami Day, turns a workshop request into an approval checklist, keeps counseling detail out of the funder report, and drafts a grant update from a truth ledger. The same network staffs a shift, recruits a person who already offered to help, and lets a second community accept a public same-day need. A sensor node shows when the desk is listening. Chat, executive task planning, and voice use OpenAI.
+Veridian Desk is a push-to-talk assistant for nonprofits, communities, and the people in them. Staff and neighbors say each fact once. The browser recognizes their speech and speaks the confirmation without a voice key; optional GPT plans the filing actions. The desk files the note, merges a duplicate donor before Give Miami Day, turns a workshop request into an approval checklist, keeps counseling detail out of the funder report, and drafts a grant update from a truth ledger. The same network staffs a shift, recruits a person who already offered to help, and lets a second community accept a public same-day need. A sensor node shows when the desk is listening. GPT powers chat and executive task planning; voice uses the browser.
 
 ## Run it
 
 ```bash
 cd web
 npm install
-cp .env.example .env.local      # set OPENAI_API_KEY here, or export it in your shell
-npm run dev -- -H 0.0.0.0       # -H lets the hardware node reach the laptop
+npm run dev                    # open localhost:3000/desk for browser hardware APIs
 # open http://localhost:3000/desk
 ```
 
 Before you go on:
 
-1. The header pill should say **OpenAI GPT · ready** when the server key is configured. Verify connectivity with a chat message. With no key, filing still uses desk rules and chat/planning show a missing-key message.
+1. The header pill should say **Browser voice · no key needed**. Allow microphone access in a browser with speech recognition. GPT is optional: without its key, voice and desk-rule filing still work.
 2. Do one live test so the browser asks for the microphone now, not on stage: **Arm**, hold **Hold to talk**, say “This is Ana. Testing the desk.”, release, and listen for the spoken confirmation.
 3. Press **Reset demo** twice (the second click confirms). The desk is back to the seed.
-4. Laptop volume up. OpenAI speaks the confirmation with an AI-generated voice.
+4. Laptop volume up. The browser speaks the confirmation using speech synthesis. No speech-provider key is needed.
 
 Every line below has a button in the left panel. The buttons send the exact text through the same pipeline as the mic (`POST /api/desk/hear`), so a loud room cannot kill the demo. Speak a line live when the room is quiet. Use the button when it is not.
 
@@ -36,12 +35,12 @@ Select **Owen**, send “What needs attention today?” in Chat, then ask a foll
 
 | Time | Do | Say / point at |
 |---|---|---|
-| 0:00 | **Arm.** Status LISTENING, red light, screen line “Listening — Tidepath desk”. | “Nothing listens until a person arms it. Push-to-talk only. No room recording.” |
+| 0:00 | **Arm.** Status ARMED. Hold to talk, or wave 2–20 cm from the connected Arduino sonar; status changes to LISTENING. | “Nothing listens until a person arms it. Hold to talk or use a hand gesture for an eight-second clip.” |
 | 0:15 | **2 · Marisol:** “This is Marisol. Jordan missed mentoring on Tuesday. Call his mom this week.” | Calls board: Jordan's mom, due Friday. Quarterly report follow-ups go 0 → 1. |
 | 0:35 | **3 · Denise:** “This is Denise. Maria Gonzalez is on the donor list twice and has not given since March.” | Two records become one; the shared gift counts once. “Call before Give Miami Day — Thu, Nov 19.” |
 | 0:55 | **4 · Yesenia:** “This is Yesenia. Edison Elementary wants a safety workshop on Thursday in Spanish.” | Card: Edison, Thu Nov 12, Español, `slides-pending`, checklist with an owner per step. |
 | 1:15 | **5 · Reginald:** “This is Reginald. Session note: Jordan talked about panic before school. Funder does not need that detail.” | Stored once under CLINICAL. Flip **Funder view**: only “School-based counseling session completed” + ledger id. |
-| 1:40 | **6 · Owen:** “This is Owen. Ana volunteered 3 hours yesterday. We need a driver in West Little River today.” | Hours count once. Driver shift opens, urgent and routed to Owen. The red light blinks (the wired node also chirps). Luis gets a pending offer with one sentence on why. |
+| 1:40 | **6 · Owen:** “This is Owen. Ana volunteered 3 hours yesterday. We need a driver in West Little River today.” | Hours count once. Driver shift opens, urgent and routed to Owen. The status light blinks. Luis gets a pending offer with one sentence on why. |
 | 2:05 | **7 · Claudette:** “This is Claudette. Draft the county quarterly update. Only what is true.” | Every figure cites a ledger id. Only $120,000 and $80,000. Spend line shows the funder's rule. |
 | 2:30 | **8 · Beatriz:** “This is Beatriz. Colony B needs food today.” | Colony B is a public card the same day. The network proposes Tidepath's run ↔ Mangrove's food run, pending both orgs. |
 | 2:50 | **9 · Luis's chip** (B2C). Optional: the Spanish line “Soy Luis. Hoy puedo manejar en West Little River.” Then **Accept**. | His desk shows the shift; Tidepath's staffing card shows filled; the blink stops. “Decline works too, and costs him nothing.” |
@@ -56,27 +55,27 @@ Select **Owen**, send “What needs attention today?” in Chat, then ask a foll
 - **“What crosses between organizations?”** Only `PUBLIC_COMMUNITY`, built from structured fields (org, kind, area, day). `POST /api/desk/match/accept` re-checks and rejects names, counseling content, amounts and addresses.
 - **“Does it learn?”** One honest thing: Marisol clicks *Group call list by school* once, and the desk remembers it on her profile (`rememberPreference`). Nothing else is learned.
 - **“Haitian Creole?”** Live Creole audio has not been verified for this demo, so Creole notes are entered by staff. The Jean-Baptiste household shows how.
-- **“Where's the AI?”** GPT handles multi-turn chat, executive task planning, and structured filing plans. OpenAI also transcribes and speaks. Filing tools enforce deduplication, privacy, the ledger and consent; offline rules preserve the demo if OpenAI is unavailable.
+- **“Where's the AI?”** GPT handles multi-turn chat, executive task planning, and structured filing plans. The browser handles speech recognition and playback without an application key. Filing tools enforce deduplication, privacy, the ledger and consent; offline rules preserve the demo if OpenAI is unavailable.
 
 ## If something breaks
 
 | Problem | What happens / do this |
 |---|---|
-| No key or OpenAI times out | Lines still file; the card says *filed by desk rules — voice skipped*. Keep going with the buttons. |
+| No key or OpenAI times out | Voice and demo lines still file by desk rules, with browser-spoken confirmations. GPT chat/planning require the optional OpenAI key. |
 | Mic blocked | Use the buttons. |
-| Node unplugged or Wi-Fi down | The on-screen node is the device. The laptop does not depend on it. |
+| Arduino unplugged | Pending sonar capture is discarded. Manual push-to-talk and the on-screen node remain available. |
 | Demo state is messy | **Reset demo** (two clicks). State lives in `web/data/desk-state.json`. |
 
 Prove it before you go on: `cd web && npm run desk:smoke` runs this whole script offline and checks the definition of done.
 
 ## What is real and what is demo
 
-- Real: push-to-talk capture, GPT Responses API chat/planning, OpenAI file transcription and Realtime speech, say-it-once keys, the truth-ledger guard, server-side funder redaction, the public-only network check, dual-consent accept, B2C accept/decline, the JSON store, and the node protocol.
+- Real: push-to-talk capture, GPT Responses API chat/planning, browser speech recognition and synthesis, say-it-once keys, the truth-ledger guard, server-side funder redaction, the public-only network check, dual-consent accept, B2C accept/decline, the JSON store, and the node protocol.
 - Demo: all people, organizations, schools, donors and amounts are fictional. Tidepath Family Alliance and Mangrove Mews are made up.
 
 ## Submission checklist
 
 - [ ] Public GitHub repo with an MIT or Apache-2.0 license (see `docs/hackathon/LICENSE`).
-- [ ] No keys in the repo: `web/.env.local` is gitignored. Rotate the OpenAI key after the weekend.
+- [ ] No keys are needed for voice. If using GPT, keep the OpenAI key in the server environment; `web/.env.local` is gitignored.
 - [ ] DeepStation: project name, this blurb, GitHub link → **Submit Project** by 4:45 PM ET.
 - [ ] Optional: phone video of one full run (YouTube link or MP4 ≤ 500 MB).

@@ -31,7 +31,7 @@ Judges fund nonprofits. They have seen chatbots. Win by showing all of this in o
 4. A counselor's note exists once, and the funder view is a redaction.
 5. A second community's agent answers a public need with dual consent.
 6. A physical node shows listening / working / urgent. The laptop still works if the node is unplugged.
-7. **OpenAI powers the assistant.** GPT handles chat, executive task planning, and validated filing plans. OpenAI also transcribes utterances and speaks confirmations. Desk tools file the work; an Agents SDK is not required.
+7. **Browser voice needs no key.** Browser speech recognition handles the microphone and speech synthesis reads confirmations. Optional OpenAI GPT handles chat, executive task planning, and validated filing plans. Desk tools file the work; an Agents SDK is not required.
 
 ## Who it serves
 
@@ -52,7 +52,7 @@ Four automations, both sides:
 ## Secrets
 
 - Never hardcode API keys. Never print them. Never commit them.
-- `OPENAI_API_KEY` comes from the local shell or `web/.env.local`, and the same server-side variable on Vercel. Never expose it with a `NEXT_PUBLIC_` prefix.
+- `OPENAI_API_KEY` is optional for GPT chat/planning and comes from the local shell or `web/.env.local`, and the same server-side variable on Vercel. Voice and desk-rule filing need no key. Never expose it with a `NEXT_PUBLIC_` prefix.
 - `.gitignore` already ignores `web/.env`, `web/.env.*` (except `web/.env.example`), and `web/data/desk-state.json`.
 - Add `web/.env.example` with empty values and one-line comments.
 - OpenAI is called only from a server route. The browser never sees the key.
@@ -64,7 +64,7 @@ Four automations, both sides:
 - Do not call Luma, and do not route new traffic through `luma-rate-limit.ts`. This demo does not need Luma.
 - Do not scrape.
 - No always-on microphone. No hidden recording. No "listen to the room" mode.
-- Capture is push-to-talk only, after an explicit arm, with a visible listening state. Follow the node-clip state machine: IDLE → ARMED (consent) → LISTENING → WORKING → FILED → IDLE. Raw audio is not stored. Keep the transcript only as the filed note the staffer just spoke.
+- Capture is push-to-talk or one Arduino sonar-triggered clip of up to eight seconds, after an explicit arm, with a visible listening state. Follow the node-clip state machine: IDLE → ARMED (consent) → LISTENING → WORKING → FILED → IDLE. Raw audio is not stored. Keep the transcript only as the filed note the staffer just spoke.
 - Data classes: `PUBLIC_COMMUNITY`, `OPERATIONAL`, `DONOR`, `CLINICAL`. The agent-to-agent network may carry only `PUBLIC_COMMUNITY`. It must not contain child names, counseling content, donor amounts, or addresses.
 - Demo data is fictional. Tidepath Family Alliance and Mangrove Mews are made-up.
 - Human approval before any outward send. Matches stay `pending` until the demo clicks Accept.
@@ -101,7 +101,7 @@ Say-it-once is an idempotency key: normalized utterance text + speaker + day. A 
 
 Self-learning, demo-honest: tool `rememberPreference`. Seed Marisol with no preference. After the demo clicks "Group call list by school", persist `{ callListGrouping: "school" }` on her profile and show "Veridian remembered". Next render uses it. No other learning system.
 
-Spanish: one live or scripted line must file in Spanish and show the language on the card. Haitian Creole: seed one family marked `ht` with a staff-entered summary. Do not claim live Creole transcription unless you have verified the selected OpenAI model supports `ht`. If it does not, say so in the UI as "Creole notes are entered by staff".
+Spanish: one live or scripted line must file in Spanish and show the language on the card. Haitian Creole: seed one family marked `ht` with a staff-entered summary. Do not claim live Creole transcription unless you have verified the browser speech service supports `ht`. If it does not, say so in the UI as "Creole notes are entered by staff".
 
 ## Demo script (rehearse this, do not improvise)
 
@@ -139,22 +139,22 @@ Put this in `web/lib/desk/seed.ts`. The truth ledger is the only source of numbe
 
 ```
 Mic or scripted line
-  → POST /api/desk/hear   (OpenAI transcribes; scripted text skips transcription)
+  → POST /api/desk/hear   (browser-generated transcript or typed/scripted text only)
   → desk router + tools in web/lib/desk/tools.ts
   → web/data/desk-state.json
-  → OpenAI Realtime speaks one confirmation sentence
+  → browser speechSynthesis speaks one confirmation sentence
   → one screen at /desk
 ```
 
 Hardware is a physical echo of the same state, not a second brain.
 
-- OpenAI voice: `/v1/audio/transcriptions` transcribes with `gpt-transcribe`; the Realtime WebSocket API speaks a short confirmation with `gpt-realtime-2.1-mini`. Authentication stays server-side via `OPENAI_API_KEY`. Model overrides are documented in `web/.env.example`.
+- Browser voice: `SpeechRecognition` (or `webkitSpeechRecognition`) transcribes push-to-talk; `speechSynthesis` reads the returned confirmation. Neither needs an application key. Browser speech may use a vendor service. Never upload raw audio to the app or OpenAI. Stop waits for final recognition; Disarm aborts and discards pending results.
 - Planner: `web/lib/desk/planner.ts` uses the OpenAI Responses API and a strict schema for reply, tasks, and filing actions. `web/lib/desk/agent.ts` applies validated plans through existing tools and retains the offline rules router. Chat and plan modes discard all filing actions.
 - Tools are plain TypeScript functions. They read and write the JSON store. They return the updated card. They do not call a model.
-- Server route runtime nodejs. Maximum duration 60s; GPT has a 20s timeout, transcription 12s, and spoken output 8s within a 55s overall budget. On timeout or a missing key, run the deterministic fallback that still files the scripted demo lines via the tools, and label the card "filed by desk rules — voice skipped". Scripted lines must succeed offline.
-- `POST /api/desk/hear` accepts either `{ text }` or `{ audioBase64, mimeType }`. Audio goes to OpenAI, then the transcript goes to the GPT planner. Text requests also accept `mode: chat | plan | file` and bounded `messages` history. The response includes the transcript, the cards changed, and the confirmation audio or a URL the page can play.
+- Server route runtime nodejs. Maximum duration 30s; optional GPT has a 20s timeout. On timeout or a missing OpenAI key, filing uses the desk rules, while browser voice still works. Chat/planning errors never become filed records.
+- `POST /api/desk/hear` accepts `{ text, source: voice | typed | script, lang? }`, optional `mode: chat | plan | file`, and bounded `messages` history. Audio uploads are rejected. Voice transcripts require an armed window. The response includes the transcript, changed cards, and confirmation text for browser playback.
 - `GET /api/desk/state` returns boards, node state, preferences, match proposals.
-- `POST /api/desk/node` accepts `{ event: "arm" | "disarm" | "presence" }`. Arm starts LISTENING. Disarm returns IDLE and drops any unfiled audio. Presence (PIR) only adds a front-desk banner "Someone is at the desk" — it does not start the microphone.
+- `POST /api/desk/node` accepts `{ event: "arm" | "disarm" | "presence" }`. Arm opens a capture window. Disarm returns IDLE and drops any unfiled speech. Presence only adds a front-desk banner. Arduino sonar triggers reach the browser over USB and start recognition only within an armed window.
 - `POST /api/desk/match/accept` with the proposal id. Both orgs must be in the payload check: class is `PUBLIC_COMMUNITY` or the route rejects.
 
 Client page `web/app/desk/page.tsx` is a client console. Boards: Calls, Donors, Workshops, Notes (staff vs funder toggle), Staffing, Recruiting, Grants, Colony, Network. Node panel: status, Arm, Disarm, scripted line buttons, push-to-talk, and the spoken confirmation. Org / person chips switch B2B and B2C. Luis's chip shows his note, his shift offer, and Accept / Decline. Link it from the header only if that is a one-line addition. Do not restyle the rest of the site.
@@ -163,21 +163,16 @@ Client page `web/app/desk/page.tsx` is a client console. Boards: Calls, Donors, 
 
 Kit: SunFounder Universal Maker Sensor Kit, ASIN B0D3GWJK82. It includes sensors and an OLED. It does **not** include a Pico, ESP32, or Arduino, and it has **no microphone**. Do not try to do speech-to-text on the kit.
 
-Voice in and voice out are the laptop plus OpenAI. The node displays state and sends arm / disarm / presence.
+Voice in and voice out use the laptop microphone and browser speech APIs, with no application key. The Arduino Uno or classic Nano displays state and sends sonar gestures over USB serial at 115200 baud.
 
-Use only: button or touch (arm/disarm), RGB LED or traffic light (idle white/off, listening red, working amber, filed green, urgent blink), SSD1306 OLED or LCD1602 (one status line), PIR HC-SR501 (presence only), passive buzzer (one short chirp on Owen's urgent card). Skip everything else.
+- Firmware: `firmware/desk_node/desk_node.ino` using Adafruit SSD1306 and GFX.
+- Adafruit I²C OLED: SCK/SCL → A5, SDA → A4. Probe addresses 0x3C and 0x3D.
+- HC-SR04 sonar: Trig → pin 7, Echo → pin 6. A fresh hand gesture at 2–20 cm starts browser recognition after Arm. Move away beyond 30 cm before repeating.
+- Status LED: pin 5 through a resistor. Armed pulse, listening solid, working blink, filed solid, idle/offline off.
+- On `/desk`, choose Connect Arduino in desktop Chrome or Edge on localhost or HTTPS. The browser sends display state every second and listens for newline-delimited sonar events.
+- Sonar capture stops after eight seconds or when recognition ends. Stop and file finishes sooner; Disarm or USB disconnection cancels a pending capture.
 
-If no microcontroller is available, ship `firmware/README.md` with the protocol and make the on-screen node the device. Do not block the software on wiring.
-
-If a Pico W or ESP32 is on the table, `firmware/desk_node.py` (MicroPython) or a tiny Arduino sketch:
-
-- On boot, OLED "Veridian Desk".
-- Button toggles arm and POSTs to `http://<laptop>:3000/api/desk/node`.
-- Poll `GET /api/desk/state` every 1s and mirror `node.status` and `node.line` to the OLED and LED.
-- PIR posts presence when the desk transitions to occupied, not continuously.
-- Buzzer only when `node.urgent === true`, then clear.
-
-Document the wiring in `firmware/README.md` in ten lines. No Fritzing novel.
+Document wiring, upload and protocol in `firmware/README.md`. The on-screen node and manual push-to-talk work without a microcontroller.
 
 ## Files to add
 
@@ -196,7 +191,7 @@ Document the wiring in `firmware/README.md` in ten lines. No Fritzing novel.
 - `web/components/desk/DeskConsole.tsx`
 - `web/.env.example`
 - `firmware/README.md`
-- `firmware/desk_node.py` (only if short and real)
+- `firmware/desk_node/desk_node.ino`
 - `docs/hackathon/DEMO-SCRIPT.md` (the 4-minute script plus the DeepStation blurb below)
 - `LICENSE` only if one does not exist — MIT. Do not relicense third-party code you did not add. If adding a root LICENSE would misrepresent the existing private app, instead put MIT in `docs/hackathon/LICENSE` and say in the README that the **submission repo** must be public and MIT or Apache-2.0. Do not flip this repo public yourself.
 
@@ -206,7 +201,7 @@ Do not edit the scene digest, CRM storage format, or social-scene store except a
 
 1. Types, seed, store, privacy, tools, fallback. Scripted Marisol line files once and the repeat is ignored. Prove with a small node script or a route test you can run.
 2. `/desk` UI reading `GET /api/desk/state`, scripted buttons calling fallback so the demo already works.
-3. OpenAI on the same tools: transcribe push-to-talk, route, speak the one-sentence confirmation. Same cards if the key is missing.
+3. Browser voice on the same tools: recognize push-to-talk, submit the transcript, and speak the confirmation. Same cards and browser playback if the OpenAI key is missing.
 4. Node LED/OLED echo, or skip if no board.
 5. Shift accept on Luis's desk, org-match accept, funder toggle, Give Miami Day line.
 6. `npm run build` in `web/`. Fix type errors you created.
@@ -226,7 +221,7 @@ Do not edit the scene digest, CRM storage format, or social-scene store except a
 - `npm run build` succeeds.
 - README or DEMO-SCRIPT includes this submission blurb, unchanged in substance:
 
-> Veridian Desk is a push-to-talk assistant for nonprofits, communities, and the people in them. Staff and neighbors say each fact once. OpenAI transcribes their speech, plans filing actions with GPT, and speaks the confirmation. The desk files the note, merges a duplicate donor before Give Miami Day, turns a workshop request into an approval checklist, keeps counseling detail out of the funder report, and drafts a grant update from a truth ledger. The same network staffs a shift, recruits a person who already offered to help, and lets a second community accept a public same-day need. A sensor node shows when the desk is listening. Chat, executive task planning, and voice use OpenAI.
+> Veridian Desk is a push-to-talk assistant for nonprofits, communities, and the people in them. Staff and neighbors say each fact once. The browser recognizes their speech and speaks the confirmation without a voice key; optional GPT plans filing actions. The desk files the note, merges a duplicate donor before Give Miami Day, turns a workshop request into an approval checklist, keeps counseling detail out of the funder report, and drafts a grant update from a truth ledger. The same network staffs a shift, recruits a person who already offered to help, and lets a second community accept a public same-day need. A sensor node shows when the desk is listening. GPT powers chat and executive task planning; voice uses the browser.
 
 ## Out of scope
 
@@ -234,4 +229,4 @@ Payments, ticketing, eBay-style checkout, wallets, Solana, login, a mobile app, 
 
 ## When you finish
 
-Report: files added, how to run, whether OpenAI chat, planning, transcription and speech are live or the scripted fallback is on, hardware status. Do not claim a sensor works if it is not wired.
+Report: files added, how to run, whether GPT chat/planning are configured, browser recognition/playback are supported, and desk-rule filing is in use, hardware status. Do not claim a sensor works if it is not wired.

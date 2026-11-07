@@ -1,6 +1,6 @@
 /** Shared response shape for desk routes (server-only). */
 
-import { assistantModel, CREOLE_LIVE, openaiKey } from "./openai";
+import { assistantModel, openaiKey } from "./openai";
 import { nodeView } from "./node";
 import { persistenceOk } from "./store";
 import { giveMiamiDay, todayISO } from "./time";
@@ -17,7 +17,7 @@ export function deskPayload(state: DeskState, now: Date) {
   return {
     state,
     node: nodeView(state, now),
-    voiceReady: { key: Boolean(openaiKey()), creoleLive: CREOLE_LIVE },
+    voiceReady: { provider: "browser", requiresKey: false, creoleLive: false },
     assistantReady: { key: Boolean(openaiKey()), model: assistantModel() },
     persistence: persistenceOk(),
     today,

@@ -1,11 +1,10 @@
-/** Exercise the real SDK and route against a local HTTP/WebSocket OpenAI fixture. */
+/** Exercise the real SDK and route against a local HTTP OpenAI fixture. */
 import assert from "node:assert/strict";
 import { after, before, beforeEach, test } from "node:test";
 import { createServer } from "node:http";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { WebSocketServer } from "ws";
 import { POST } from "../app/api/desk/hear/route";
 import { aiError } from "../lib/desk/openai";
 import { planningContext, planUtterance } from "../lib/desk/planner";
@@ -23,10 +22,7 @@ let responseStatus = "completed";
 let refuse = false;
 let rawText: string | null = null;
 let delay = 0;
-let voiceFails = false;
-let transcript = "Soy Luis. Hoy puedo manejar en West Little River.";
 let requests: { url: string; body: string; auth?: string }[] = [];
-let voiceInput = "";
 let dir: string;
 let seedNotes = 0;
 
@@ -39,8 +35,6 @@ const server = createServer(async (req, res) => {
   res.setHeader("Content-Type", "application/json");
   if (apiStatus !== 200) {
     res.writeHead(apiStatus).end(JSON.stringify({ error: { message: "fixture upstream failure", type: "api_error" } }));
-  } else if (req.url === "/v1/audio/transcriptions") {
-    res.end(JSON.stringify({ text: transcript, languages: [{ code: "es" }] }));
   } else {
     res.end(JSON.stringify({
       id: "resp_test", object: "response", status: responseStatus, model: "gpt-4.1-mini",
@@ -49,26 +43,6 @@ const server = createServer(async (req, res) => {
       ] }],
     }));
   }
-});
-const wss = new WebSocketServer({ server });
-wss.on("connection", (socket, req) => {
-  assert.equal(req.headers.authorization, "Bearer test-desk-key");
-  socket.send(JSON.stringify({ type: "session.created", session: {} }));
-  socket.on("message", (raw) => {
-    const event = JSON.parse(raw.toString());
-    if (event.type === "session.update") {
-      assert.deepEqual(event.session.audio.output.format, { type: "audio/pcm", rate: 24000 });
-      socket.send(JSON.stringify({ type: "session.updated", session: {} }));
-    }
-    if (event.type === "conversation.item.create") voiceInput = event.item.content[0].text;
-    if (event.type === "response.create") {
-      if (voiceFails) socket.send(JSON.stringify({ type: "error", error: { message: "fixture voice failure", type: "server_error" } }));
-      else {
-        socket.send(JSON.stringify({ type: "response.output_audio.delta", delta: Buffer.alloc(48).toString("base64") }));
-        socket.send(JSON.stringify({ type: "response.done", response: { status: "completed" } }));
-      }
-    }
-  });
 });
 
 before(async () => {
@@ -81,13 +55,10 @@ before(async () => {
 beforeEach(async () => {
   process.env.OPENAI_API_KEY = "test-desk-key";
   fixture = blankPlan(); apiStatus = 200; responseStatus = "completed"; refuse = false;
-  rawText = null; delay = 0; voiceFails = false; requests = []; voiceInput = "";
-  transcript = "Soy Luis. Hoy puedo manejar en West Little River.";
+  rawText = null; delay = 0; requests = [];
   seedNotes = (await resetState()).notes.length;
 });
 after(async () => {
-  for (const socket of wss.clients) socket.terminate();
-  await new Promise<void>((resolve) => wss.close(() => resolve()));
   await new Promise<void>((resolve) => server.close(() => resolve()));
   await rm(dir, { recursive: true, force: true });
   for (const [key, value] of Object.entries({ OPENAI_API_KEY: originalEnv.key, OPENAI_BASE_URL: originalEnv.base, DESK_STATE_PATH: originalEnv.state })) {
@@ -199,30 +170,38 @@ test("request validation rejects null, invalid modes and injected history roles"
   assert.equal(requests.length, 0);
 });
 
-test("audio consent gates all API calls, then Spanish audio transcribes, files, and speaks", async () => {
-  fixture = { ...blankPlan(), lang: "es", actions: [{ tool: "filePersonalNote", args: {} }] };
-  const body = { audioBase64: Buffer.from("fake audio fixture").toString("base64"), mimeType: "audio/webm;codecs=opus", profileHint: "luis" };
+test("browser voice works without a key and still requires Arm", async () => {
+  delete process.env.OPENAI_API_KEY;
+  const body = { text: "Soy Luis. Hoy puedo manejar en West Little River.", source: "voice", lang: "es", profileHint: "luis" };
   const unarmed = await send(body);
   assert.equal(unarmed.status, 409); assert.equal(requests.length, 0);
   await mutate((s) => arm(s, new Date()));
   const { data } = await send(body);
-  assert.equal(data.ok, true); assert.equal(data.voice.heard, "live"); assert.equal(data.voice.spoke, "live");
+  assert.equal(data.ok, true); assert.equal(data.assistant.status, "fallback");
   assert.equal(data.outcome.lang, "es"); assert.equal(data.state.notes[0].dataClass, "OPERATIONAL");
   assert.match(data.state.notes[0].text, /Hoy puedo manejar/);
-  assert.equal(data.speech.mimeType, "audio/wav");
-  const audio = Buffer.from(data.speech.audioBase64, "base64");
-  assert.equal(audio.toString("ascii", 0, 4), "RIFF"); assert.equal(audio.readUInt32LE(24), 24000);
-  assert.equal(voiceInput, data.outcome.spoken);
-  assert.match(requests[0].body, /name="file"; filename="desk-clip.webm"/);
-  assert.match(requests[0].body, /gpt-transcribe/);
+  assert.equal(data.voiceReady.provider, "browser"); assert.equal(data.voiceReady.requiresKey, false);
+  assert.match(data.voice.via, /browser voice/);
+  assert.ok(data.outcome.spoken); assert.equal(data.speech, undefined);
+  assert.ok(!data.notice.includes("OPENAI_API_KEY")); assert.equal(requests.length, 0);
+  const repeatedWithoutArm = await send(body);
+  assert.equal(repeatedWithoutArm.status, 409);
 });
 
-test("voice failure leaves a successfully filed record and visible confirmation", async () => {
-  voiceFails = true; fixture = { ...blankPlan(), actions: [{ tool: "filePersonalNote", args: {} }] };
+test("even with GPT configured, confirmations require no server voice requests", async () => {
+  fixture = { ...blankPlan(), actions: [{ tool: "filePersonalNote", args: {} }] };
   const response = await send({ text: "This is Luis. I can help today.", profileHint: "luis", source: "script" });
   assert.equal(response.data.ok, true); assert.equal(response.data.state.notes.length, seedNotes + 1);
-  assert.equal(response.data.voice.spoke, "error"); assert.equal(response.data.speech, null);
-  assert.match(response.data.notice, /Spoken confirmation/);
+  assert.equal(response.data.speech, undefined); assert.ok(response.data.outcome.spoken);
+  assert.equal(requests.length, 1); assert.equal(requests[0].url, "/v1/responses");
+});
+
+test("the server rejects audio uploads and accepts browser transcripts only", async () => {
+  for (const body of [
+    { audioBase64: "ZmFrZSBhdWRpbw==", mimeType: "audio/webm", profileHint: "luis" },
+    { text: "hello", audioBase64: "ZmFrZSBhdWRpbw==", profileHint: "luis" },
+  ]) assert.equal((await send(body)).status, 400);
+  assert.equal(requests.length, 0);
 });
 
 test("stored clinical/private records and other-organization work stay out of model context", async () => {
