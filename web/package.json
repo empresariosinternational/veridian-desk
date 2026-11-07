@@ -8,7 +8,8 @@
     "start": "next start",
     "refresh-data": "python3 ../luma-scene/luma_scene.py run && cp ../luma-scene/out/data.json public/data.json",
     "desk:smoke": "tsx scripts/desk-smoke.ts",
-    "desk:test": "tsx --test scripts/desk-*.test.ts"
+    "desk:test": "tsx --test scripts/desk-*.test.ts",
+    "veridian:test": "tsx --test scripts/veridian-*.test.ts"
   },
   "dependencies": {
     "framer-motion": "^12.40.0",

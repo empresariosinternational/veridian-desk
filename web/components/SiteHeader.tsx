@@ -1,11 +1,13 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { Suspense, useMemo } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { fadeUp } from "@/lib/motion";
 import ProfileMenu from "@/components/ProfileMenu";
+import { VeridianCTA } from "@/components/VeridianContext";
 
 const LINKS = [
   ["home", "/"],
@@ -16,7 +18,6 @@ const LINKS = [
 ] as const;
 
 function NavLinks() {
-  const reduce = useReducedMotion();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
@@ -32,28 +33,22 @@ function NavLinks() {
 
   return (
     <>
-      {LINKS.map(([label, href], i) => {
+      {LINKS.map(([label, href]) => {
         const withQs = href === "/setup" ? href : `${href}${qs}`;
         const active =
           href === "/"
             ? pathname === "/"
             : pathname === href || pathname.startsWith(`${href}/`);
         return (
-          <motion.a
+          <Link
             key={href}
             href={withQs}
+            prefetch={false}
             className={active ? "nav-active" : undefined}
             aria-current={active ? "page" : undefined}
-            custom={0.04 + i * 0.04}
-            variants={fadeUp}
-            initial={reduce ? false : "hidden"}
-            animate={reduce ? undefined : "show"}
-            whileHover={reduce ? undefined : { scale: 1.02 }}
-            whileTap={reduce ? undefined : { scale: 0.98 }}
-            transition={{ type: "spring", stiffness: 400, damping: 28 }}
           >
             {label}
-          </motion.a>
+          </Link>
         );
       })}
     </>
@@ -71,12 +66,11 @@ export default function SiteHeader() {
       initial={reduce ? false : "hidden"}
       animate={reduce ? undefined : "show"}
     >
-      <motion.a
+      <Link
         href="/"
+        prefetch={false}
         className="brand"
         aria-label="agentscene home"
-        whileHover={reduce ? undefined : { opacity: 0.7 }}
-        transition={{ duration: 0.12 }}
       >
         <Image
           className="brand-logo"
@@ -87,7 +81,7 @@ export default function SiteHeader() {
           priority
         />
         <span className="brand-word">agentscene</span>
-      </motion.a>
+      </Link>
 
       <div className="hdr-center">
         <nav aria-label="primary">
@@ -98,6 +92,7 @@ export default function SiteHeader() {
       </div>
 
       <div className="hdr-right">
+        <VeridianCTA />
         <Suspense fallback={<div className="profile-tab skeleton" aria-hidden />}>
           <ProfileMenu />
         </Suspense>

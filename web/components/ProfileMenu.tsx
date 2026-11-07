@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import {
   ensureLocalProfile,
   loadSocialStore,
@@ -64,7 +65,7 @@ export default function ProfileMenu() {
   return (
     <div className="profile-menu" ref={rootRef}>
       <div className={`profile-tab${active ? " on" : ""}`}>
-        <a href={profileHref} className="profile-tab-main" aria-label="open profile hub">
+        <Link href={profileHref} prefetch={false} className="profile-tab-main" aria-label="open profile hub">
           <span className="profile-tab-avatar" aria-hidden>
             {initial}
           </span>
@@ -76,7 +77,7 @@ export default function ProfileMenu() {
                 : "your hub"}
             </span>
           </span>
-        </a>
+        </Link>
         <button
           type="button"
           className="profile-tab-chevron"
@@ -97,10 +98,10 @@ export default function ProfileMenu() {
           <ul>
             {items.map((it) => (
               <li key={it.href}>
-                <a href={it.href} role="menuitem" onClick={() => setOpen(false)}>
+                <Link href={it.href} prefetch={false} role="menuitem" onClick={() => setOpen(false)}>
                   <span>{it.label}</span>
                   <em>{it.hint}</em>
-                </a>
+                </Link>
               </li>
             ))}
           </ul>

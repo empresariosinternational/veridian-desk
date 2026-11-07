@@ -1647,93 +1647,138 @@ main {
 }
 .crm-linked a:hover { color: var(--accent-bright); }
 
-/* Veridian floating dock */
-.veridian-fab {
+/* VCTA: one persistent entry in the sticky navigation. */
+.hdr-right { gap: 10px; }
+.hdr nav a { white-space: nowrap; flex-shrink: 0; }
+.vcta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 8px 13px;
+  border: 1px solid var(--veridian);
+  border-radius: var(--r-pill);
+  background: var(--veridian-soft);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+  font-weight: var(--w-semibold);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--dur-fast), border-color var(--dur-fast);
+}
+.vcta:hover, .vcta-open { background: var(--surface-3); border-color: var(--veridian-bright); }
+.vcta:focus-visible, .vcta-panel :is(button, input, select, textarea, summary):focus-visible { outline: 2px solid var(--veridian-bright); outline-offset: 3px; }
+.vcta-panel {
   position: fixed;
   right: 20px;
   bottom: 20px;
-  z-index: 80;
-  width: 54px;
-  height: 54px;
-  border-radius: 50%;
-  border: 1px solid rgba(124, 77, 216, 0.45);
-  background: var(--page-bg);
-  box-shadow: var(--shadow-pop);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: transform var(--dur-fast) var(--ease), box-shadow var(--dur) var(--ease);
-}
-.veridian-fab:hover {
-  transform: scale(1.05);
-  box-shadow: 0 10px 32px rgba(124, 77, 216, 0.35), var(--shadow-pop);
-}
-.veridian-dock {
-  position: fixed;
-  top: 0;
-  right: 0;
-  z-index: 100;
-  width: min(400px, 100vw);
-  height: 100dvh;
+  z-index: 45;
+  width: min(440px, calc(100vw - 32px));
+  max-height: 760px;
   display: flex;
   flex-direction: column;
-  background: var(--page-bg);
-  border-left: 1px solid var(--border-strong);
-}
-.veridian-dock-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 16px 18px;
-  border-bottom: 1px solid var(--border);
-}
-.veridian-dock-body {
-  flex: 1;
-  overflow-y: auto;
-  padding: 16px 18px 28px;
-}
-.veridian-dock-greet {
-  margin: 0 0 16px;
-  font-size: var(--text-meta);
-  color: var(--text-secondary);
-  line-height: var(--lh-normal);
-}
-.veridian-dock-section { margin-bottom: 18px; }
-.veridian-dock-label {
-  font-size: 11px;
-  font-weight: var(--w-semibold);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--veridian-bright);
-  margin-bottom: 8px;
-}
-.veridian-dock-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.veridian-dock-list li {
-  font-size: var(--text-small);
-  color: var(--text-secondary);
-  border-top: 1px solid var(--border);
-  padding-top: 8px;
-}
-.veridian-dock-list strong {
-  display: block;
+  overflow: hidden;
   color: var(--text-primary);
-  margin-bottom: 2px;
+  background: var(--page-bg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-2xl);
+  box-shadow: var(--shadow-pop);
 }
-.veridian-dock-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 8px;
+.vcta-panel[hidden], .vcta-chat[hidden], .vcta-tasks[hidden] { display: none; }
+.vcta-panel button { font-family: inherit; cursor: pointer; }
+.vcta-panel button:disabled { opacity: .45; cursor: default; }
+.vcta-panel-head { display: flex; align-items: center; gap: 12px; padding: 18px 20px 14px; }
+.vcta-panel-head h2 { margin: 0; font-size: 17px; letter-spacing: -.02em; }
+.vcta-panel-head p { margin: 3px 0 0; color: var(--text-tertiary); font-size: 11px; }
+.vcta-icon-button { margin-left: auto; width: 36px; height: 36px; border: 1px solid var(--border); border-radius: var(--r-pill); background: transparent; color: var(--text-secondary); font-size: 23px; }
+.vcta-icon-button:hover { background: var(--surface-2); color: var(--text-primary); }
+.vcta-tabs { display: flex; gap: 6px; padding: 0 18px 12px; border-bottom: 1px solid var(--border); }
+.vcta-tabs button { flex: 1; padding: 9px 10px; border: 0; border-radius: var(--r-md); background: transparent; color: var(--text-secondary); font-size: 12px; }
+.vcta-tabs button[aria-selected="true"] { background: var(--surface-2); color: var(--text-primary); }
+.vcta-tabs span { margin-left: 5px; font-size: 10px; color: var(--veridian-bright); }
+.vcta-chat { min-height: 0; flex: 1; display: flex; flex-direction: column; }
+.vcta-conversation { flex: 1; min-height: 140px; overflow-y: auto; padding: 20px 18px; overscroll-behavior: contain; }
+.vcta-welcome { padding: 18px 6px 8px; }
+.vcta-eyebrow { color: var(--veridian-bright); font-size: 10px; font-weight: var(--w-semibold); letter-spacing: .08em; text-transform: uppercase; }
+.vcta-welcome h3 { margin: 12px 0 8px; font-size: 26px; line-height: 1.2; letter-spacing: -.04em; }
+.vcta-welcome > p { margin: 0; color: var(--text-secondary); font-size: 13px; line-height: 1.6; }
+.vcta-up-next { display: flex; flex-direction: column; gap: 5px; margin-top: 26px; padding: 14px; border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--surface-1); }
+.vcta-up-next > span, .vcta-up-next small { color: var(--text-tertiary); font-size: 10px; }
+.vcta-up-next strong { font-size: 13px; font-weight: var(--w-semibold); overflow-wrap: anywhere; }
+.vcta-message { margin-bottom: 16px; padding: 12px 14px; border-radius: var(--r-lg); font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+.vcta-message.user { margin-left: 32px; background: var(--surface-2); }
+.vcta-message.assistant { margin-right: 8px; border: 1px solid var(--border); background: var(--surface-1); }
+.vcta-message > span { font-size: 10px; color: var(--text-tertiary); }
+.vcta-message p { margin: 4px 0 0; white-space: pre-wrap; }
+.vcta-message.has-error { color: var(--warning); }
+.vcta-suggestion { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+.vcta-suggestion strong { font-weight: var(--w-semibold); }
+.vcta-suggestion small { color: var(--text-tertiary); font-size: 10px; }
+.vcta-suggestion button { padding: 5px 0; border: 0; background: transparent; color: var(--veridian-bright); font-size: 11px; }
+.vcta-thinking { color: var(--text-tertiary); font-size: 12px; padding: 0 8px; }
+.vcta-prompts { display: flex; gap: 6px; padding: 8px 18px; }
+.vcta-prompts button { padding: 7px 11px; border: 1px solid var(--border); border-radius: var(--r-pill); background: transparent; color: var(--text-secondary); font-size: 11px; }
+.vcta-prompts button:hover { color: var(--text-primary); border-color: var(--border-strong); }
+.vcta-composer { margin: 0 16px; border: 1px solid var(--border-strong); border-radius: var(--r-lg); background: var(--surface-1); }
+.vcta-composer:focus-within { border-color: var(--veridian); }
+.vcta-composer textarea { display: block; width: 100%; max-height: 100px; resize: vertical; padding: 13px 14px 8px; border: 0; background: transparent; color: var(--text-primary); font: inherit; font-size: 13px; line-height: 1.5; }
+.vcta-composer textarea:focus-visible { outline: none; }
+.vcta-composer textarea::placeholder { color: var(--text-tertiary); }
+.vcta-compose-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 9px 9px; }
+.vcta-voice { display: inline-flex; gap: 6px; align-items: center; padding: 7px 8px; border: 0; border-radius: var(--r-sm); background: transparent; color: var(--text-secondary); font-size: 11px; touch-action: none; user-select: none; }
+.vcta-voice:hover { background: var(--surface-2); }
+.vcta-voice.is-listening { color: var(--danger); background: var(--surface-2); }
+.vcta-send { padding: 8px 13px; border: 0; border-radius: var(--r-md); background: var(--veridian); color: var(--text-primary); font-size: 12px; font-weight: var(--w-semibold); }
+.vcta-voice-options { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 9px 20px 4px; color: var(--text-tertiary); font-size: 10px; }
+.vcta-voice-options select, .vcta-voice-options button { border: 0; background: transparent; color: var(--text-tertiary); font-size: 10px; padding: 3px 0; }
+.vcta-voice-options select { max-width: 100px; }
+.vcta-voice-options option { color: var(--text-primary); background: var(--page-bg); }
+.vcta-tasks { flex: 1; min-height: 0; overflow-y: auto; padding: 20px 18px; overscroll-behavior: contain; }
+.vcta-task-heading { display: flex; gap: 10px; align-items: flex-start; justify-content: space-between; }
+.vcta-task-heading h3 { margin: 5px 0 14px; font-size: 22px; letter-spacing: -.03em; }
+.vcta-text-button { border: 0; padding: 4px 0; background: transparent; color: var(--veridian-bright); font-size: 10px; text-align: left; }
+.vcta-add-task { display: flex; gap: 8px; margin-bottom: 18px; }
+.vcta-add-task input { width: 100%; min-width: 0; border: 1px solid var(--border-strong); border-radius: var(--r-md); background: var(--surface-1); padding: 10px; color: var(--text-primary); font: inherit; font-size: 12px; }
+.vcta-add-task button { padding: 8px 12px; border: 1px solid var(--veridian); border-radius: var(--r-md); background: var(--veridian-soft); color: var(--text-primary); font-size: 12px; }
+.vcta-empty { color: var(--text-tertiary); font-size: 12px; line-height: 1.6; }
+.vcta-task-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.vcta-task { border: 1px solid var(--border); background: var(--surface-1); border-radius: var(--r-lg); padding: 12px; }
+.vcta-task-title { display: flex; align-items: flex-start; gap: 9px; font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
+.vcta-task-title input { width: 16px; height: 16px; flex-shrink: 0; margin-top: 2px; accent-color: var(--veridian); }
+.vcta-task.is-done .vcta-task-title span { text-decoration: line-through; color: var(--text-tertiary); }
+.vcta-task-controls { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0 0 25px; }
+.vcta-task-controls select, .vcta-task-controls input { width: auto; min-width: 0; max-width: 100%; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-sm); color: var(--text-secondary); padding: 5px 6px; font: inherit; font-size: 10px; color-scheme: dark; }
+.vcta-completed { margin-top: 22px; }
+.vcta-completed summary { color: var(--text-tertiary); font-size: 12px; cursor: pointer; margin-bottom: 10px; }
+.vcta-notice { margin: 6px 18px 0; color: var(--warning); font-size: 11px; line-height: 1.5; }
+.vcta-footer { flex-shrink: 0; padding: 11px 18px 14px; margin: 0; color: var(--text-tertiary); font-size: 10px; line-height: 1.5; }
+.vcta-sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+@media (max-width: 820px) { .hdr nav { flex-wrap: nowrap; } }
+@media (max-width: 640px) {
+  .hdr .brand-word { display: none; }
+  .vcta-panel { right: 12px; bottom: max(12px, env(safe-area-inset-bottom)); width: calc(100vw - 24px); border-radius: var(--r-xl); }
 }
+@media (max-width: 480px) {
+  .hdr-right { gap: 8px; }
+  .hdr .profile-tab-label { display: none; }
+  .vcta { gap: 7px; padding: 8px 10px; font-size: 12px; }
+  .vcta > svg:last-child { display: none; }
+  .vcta-welcome h3 { font-size: 24px; }
+}
+@media (max-height: 620px) {
+  .vcta-panel-head { padding: 10px 16px 8px; }
+  .vcta-panel-head h2 { font-size: 15px; }
+  .vcta-panel-head p, .vcta-voice-options, .vcta-footer { display: none; }
+  .vcta-tabs { padding: 0 12px 8px; }
+  .vcta-tabs button { padding: 6px 8px; }
+  .vcta-conversation { min-height: 0; padding: 10px 12px; }
+  .vcta-welcome { padding: 0; }
+  .vcta-welcome h3 { font-size: 18px; margin: 5px 0; }
+  .vcta-up-next { display: none; }
+}
+@media (max-height: 490px) { .vcta-prompts { display: none; } }
 
 .hdr nav a.nav-active {
   background: var(--surface-3);

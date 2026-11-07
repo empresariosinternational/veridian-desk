@@ -15,6 +15,7 @@ npm install
 npm run dev -- -H 0.0.0.0      # http://localhost:3000/desk
 npm run desk:smoke             # runs the whole demo offline and checks it
 npm run desk:test              # OpenAI integration tests using a local API fixture
+npm run veridian:test          # VCTA chat, task commands, and task validation
 ```
 
 Voice and desk-rule filing need no key. Open `/desk`, allow microphone access, press **Arm**, then hold **Hold to talk** and release to file. Choose English or Español with **Spoken language**. A browser with Web Speech recognition is required; unsupported browsers can use typed notes and demo buttons. Browser speech services may need a network connection even though the app requires no voice key.
@@ -25,7 +26,15 @@ Open `/desk` and select a profile. **Chat** supports follow-up questions with a 
 
 The only model setting is the optional `OPENAI_MODEL=gpt-4.1-mini` override in `web/.env.example`. The GPT model must support the Responses API and Structured Outputs. Voice uses the browser's built-in speech APIs and available voices.
 
-No OpenAI key or an upstream outage? Voice still works, and filing uses the desk rules. GPT chat and planning show an error without creating records. Browser playback failures leave successfully filed work intact and the written confirmation visible.
+No OpenAI key or an upstream outage? Voice still works, and filing uses the desk rules. GPT chat and planning on `/desk` show an error without creating records. The VCTA also supports direct task commands without GPT. Browser playback failures leave successfully filed work intact and the written confirmation visible.
+
+## Ask Veridian from any page
+
+**Ask Veridian** is the VCTA in the sticky navigation. It opens a conversation beside the current page, leaving navigation available. Conversation and drafts stay in place while moving through the main navigation or minimizing the panel.
+
+Type a message or hold **Hold to talk**, then release to send. Browser speech recognition and spoken replies need no voice-provider key. **My priorities** lets you add tasks, change priority and due dates, mark work done, and reopen it. Tasks are saved in this browser across reloads; conversation stays in memory for the current visit.
+
+With GPT configured, Veridian uses your task list and current page to help plan and update work. Proposed next steps have an **Add to my tasks** button. Without GPT, direct commands still work: “Add call the school tomorrow”, “Make call the school high priority”, “Complete call the school”, or **Plan my day**. The VCTA does not send messages or change external calendars.
 
 ## One desk, two sides
 

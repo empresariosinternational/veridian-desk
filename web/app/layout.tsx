@@ -2,6 +2,7 @@ import "./globals.css";
 import SiteHeader from "@/components/SiteHeader";
 import { SceneProvider } from "@/components/SceneBridge";
 import VeridianDockHost from "@/components/VeridianDockHost";
+import { VeridianProvider } from "@/components/VeridianContext";
 
 export const metadata = {
   title: "agentscene",
@@ -22,12 +23,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body>
         <SceneProvider>
-          <SiteHeader />
-          <main className="app-main">{children}</main>
-          <footer className="ftr">
-            your follows · your zip · your URL. CRM on-device. no signup, no DB.
-          </footer>
-          <VeridianDockHost />
+          <VeridianProvider>
+            <SiteHeader />
+            <main className="app-main">{children}</main>
+            <footer className="ftr">
+              your follows · your zip · your URL. CRM on-device. no signup, no DB.
+            </footer>
+            <VeridianDockHost />
+          </VeridianProvider>
         </SceneProvider>
       </body>
     </html>
