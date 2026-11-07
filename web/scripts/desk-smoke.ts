@@ -14,6 +14,7 @@ import { REMOVED } from "../lib/desk/ledger";
 import { arm, disarm, nodeView, presence, settle } from "../lib/desk/node";
 import { assertNetworkSafe, projectForFunder } from "../lib/desk/privacy";
 import { createSeedState } from "../lib/desk/seed";
+import { todayISO } from "../lib/desk/time";
 import { acceptMatch, checkSentence, isLapsed, rememberPreference, respondToShift } from "../lib/desk/tools";
 import type { DeskState } from "../lib/desk/types";
 
@@ -30,6 +31,8 @@ const say = (s: DeskState, id: string, sec: number) => processUtterance(s, { tex
 
 function run(): void {
   const s = createSeedState();
+
+  check("todayISO is Miami's date, even after 0:00 UTC", todayISO(NOW) === "2026-11-07" && todayISO(new Date("2026-11-08T03:30:00.000Z")) === "2026-11-07");
 
   // 1. Arm → LISTENING, red, OLED line.
   arm(s, at(0));
@@ -164,8 +167,28 @@ async function storeRoundTrip(): Promise<void> {
   check("Store: persistence ok", store.persistenceOk());
 }
 
+async function clientMode(): Promise<void> {
+  // Vercel: no shared disk, so the browser carries the state and the server stays stateless.
+  const file = path.join(mkdtempSync(path.join(tmpdir(), "desk-client-")), "desk-state.json");
+  process.env.DESK_STATE_PATH = file;
+  process.env.DESK_STATE_MODE = "client";
+  const { existsSync } = await import("fs");
+  const store = await import("../lib/desk/store");
+  check("Client mode: detected", store.stateMode() === "client");
+  const first = await store.openDesk(undefined).mutate((s) => processUtterance(s, { text: line("marisol").text, source: "script", now: NOW }));
+  const carried = JSON.parse(JSON.stringify(first.state));
+  const again = await store.openDesk(carried).mutate((s) => processUtterance(s, { text: line("marisol").text, source: "script", now: NOW }));
+  check("Client mode: state round-trips through the browser; repeat → Already filed", again.result.alreadyFiled && again.state.calls.filter((c) => c.about === "Jordan Alvarez").length === 1);
+  const junk = await store.openDesk({ version: 1, hacked: true }).read();
+  check("Client mode: a malformed state falls back to the seed", junk.calls.length === 1 && junk.donors.length === 6);
+  check("Client mode: nothing written to disk", !existsSync(file));
+  delete process.env.DESK_STATE_MODE;
+  check("File mode is the default off Vercel", store.stateMode() === (process.env.VERCEL ? "client" : "file"));
+}
+
 run();
 storeRoundTrip()
+  .then(clientMode)
   .then(() => {
     console.log(failures ? `\n${failures} check(s) failed.` : "\nAll checks passed.");
     process.exit(failures ? 1 : 0);

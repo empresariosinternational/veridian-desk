@@ -3,10 +3,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import VeridianMark from "@/components/VeridianMark";
 import { SCRIPT } from "@/lib/desk/fallback";
+import { nodeView, settle } from "@/lib/desk/node";
 import { fmtTime } from "@/lib/desk/time";
 import type { DeskPayload } from "@/lib/desk/payload";
 import type { FunderView } from "@/lib/desk/privacy";
-import type { BoardId, CardRef, HearOutcome, OrgId, ProfileId } from "@/lib/desk/types";
+import type { BoardId, CardRef, DeskState, HearOutcome, OrgId, ProfileId } from "@/lib/desk/types";
 import { Board, type BoardCtx, type SentenceCheck } from "./DeskBoards";
 import css from "./DeskConsole.module.css";
 
@@ -32,6 +33,28 @@ const GROUPS: { label: string; ids: ProfileId[] }[] = [
 const ALL_BOARDS = ["calls", "donors", "workshops", "notes", "staffing", "recruiting", "grants", "colony", "network"] as const;
 
 const CLOSE_LINE = "Said once. Filed once. The right person and the other community answered the same day.";
+
+const JSON_HEADERS = { "Content-Type": "application/json" };
+const STORAGE_KEY = "veridian-desk.state.v1";
+const MAX_TALK_MS = 45_000;
+
+// Client mode (Vercel): the desk's JSON lives in this browser, like the on-device CRM.
+function loadLocal(): DeskState | null {
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    return raw ? (JSON.parse(raw) as DeskState) : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveLocal(state: DeskState): void {
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch {
+    // Private mode or full storage: the desk keeps working for this tab.
+  }
+}
 
 function pickMime(): string | undefined {
   if (typeof MediaRecorder === "undefined") return undefined;
@@ -65,6 +88,11 @@ export default function DeskConsole() {
   const [done, setDone] = useState<Set<string>>(new Set());
 
   const lastWrite = useRef(0);
+  const mode = useRef<"file" | "client">("file");
+  const held = useRef<DeskState | null>(null);
+  const queue = useRef<Promise<unknown>>(Promise.resolve());
+  const talkTimer = useRef<number | null>(null);
+  const stopRef = useRef<(() => void) | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const rec = useRef<{ rec: MediaRecorder; chunks: Blob[]; stream: MediaStream; started: number } | null>(null);
   const holding = useRef(false);
@@ -77,19 +105,24 @@ export default function DeskConsole() {
   const apply = useCallback((j: Partial<DeskPayload>) => {
     if (j && j.state && j.node) {
       lastWrite.current = Date.now();
+      held.current = j.state;
+      if (mode.current === "client") saveLocal(j.state);
       setData(j as DeskPayload);
     }
   }, []);
 
-  // Poll the desk (and the physical node's button) every 1.5 s.
+  // File mode (laptop): poll the desk, and so the hardware node's button, every 1.5 s.
+  // Client mode (Vercel): the browser holds the state; a local clock settles FILED → IDLE.
   useEffect(() => {
     let alive = true;
-    const tick = async () => {
+    let timer: number | undefined;
+    const fileTick = async () => {
       const startedAt = Date.now();
       try {
         const r = await fetch("/api/desk/state", { cache: "no-store" });
         const j = (await r.json()) as DeskPayload;
-        if (alive && r.ok && startedAt >= lastWrite.current) {
+        if (alive && r.ok && j.state && startedAt >= lastWrite.current) {
+          held.current = j.state;
           setData(j);
           setOffline(false);
         }
@@ -97,11 +130,55 @@ export default function DeskConsole() {
         if (alive) setOffline(true);
       }
     };
-    tick();
-    const id = window.setInterval(tick, 1500);
+    const clientTick = () => {
+      const cur = held.current;
+      if (!cur) return;
+      const now = new Date();
+      const next = structuredClone(cur);
+      const changed = settle(next, now);
+      if (changed) {
+        held.current = next;
+        saveLocal(next);
+      }
+      const shown = changed ? next : cur;
+      setData((d) => (d ? { ...d, state: shown, node: nodeView(shown, now) } : d));
+    };
+    const boot = async () => {
+      try {
+        const r = await fetch("/api/desk/state", { cache: "no-store" });
+        let j = (await r.json()) as DeskPayload;
+        if (!alive || !j.state) return;
+        if (j.mode === "client") {
+          mode.current = "client";
+          const stored = loadLocal();
+          if (stored) {
+            // The server validates the stored desk and falls back to the seed if it is not one.
+            const r2 = await fetch("/api/desk/state", { method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ state: stored }) });
+            const j2 = (await r2.json()) as DeskPayload;
+            if (r2.ok && j2.state) j = j2;
+          }
+          if (!alive) return;
+          held.current = j.state;
+          saveLocal(j.state);
+          setData(j);
+          timer = window.setInterval(clientTick, 1000);
+        } else {
+          mode.current = "file";
+          held.current = j.state;
+          setData(j);
+          timer = window.setInterval(fileTick, 1500);
+        }
+        setOffline(false);
+      } catch {
+        if (!alive) return;
+        setOffline(true);
+        window.setTimeout(boot, 2000);
+      }
+    };
+    boot();
     return () => {
       alive = false;
-      window.clearInterval(id);
+      if (timer) window.clearInterval(timer);
     };
   }, []);
 
@@ -109,21 +186,42 @@ export default function DeskConsole() {
   const clinicalCount = data?.state.notes.filter((n) => n.dataClass === "CLINICAL").length ?? 0;
   useEffect(() => {
     if (!funderOn) return;
-    fetch("/api/desk/state?view=funder", { cache: "no-store" })
+    const req =
+      mode.current === "client"
+        ? fetch("/api/desk/state", { method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ view: "funder", state: held.current }) })
+        : fetch("/api/desk/state?view=funder", { cache: "no-store" });
+    req
       .then((r) => r.json())
       .then((j: FunderView) => setFunder(j))
       .catch(() => setFunder(null));
   }, [funderOn, clinicalCount]);
 
   const post = useCallback(
-    async <T,>(url: string, body: unknown): Promise<T | null> => {
-      try {
-        const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-        return (await r.json()) as T;
-      } catch {
-        flash("Desk server unreachable — is npm run dev running?");
-        return null;
-      }
+    async <T,>(url: string, body: Record<string, unknown>): Promise<T | null> => {
+      const send = async (): Promise<T | null> => {
+        try {
+          const payload = mode.current === "client" ? { ...body, state: held.current } : body;
+          const r = await fetch(url, { method: "POST", headers: JSON_HEADERS, body: JSON.stringify(payload) });
+          if (r.status === 429) {
+            flash("Too many requests — wait a few seconds and try again.");
+            return null;
+          }
+          const j = (await r.json()) as T & { state?: DeskState };
+          if (mode.current === "client" && j?.state) {
+            held.current = j.state;
+            saveLocal(j.state);
+          }
+          return j;
+        } catch {
+          flash(mode.current === "client" ? "Desk server unreachable — check the connection." : "Desk server unreachable — is npm run dev running?");
+          return null;
+        }
+      };
+      // Client mode: one request at a time, each carrying the latest state, so no click overwrites another.
+      if (mode.current !== "client") return send();
+      const run = queue.current.then(send, send);
+      queue.current = run.catch(() => undefined);
+      return run;
     },
     [flash],
   );
@@ -199,6 +297,10 @@ export default function DeskConsole() {
       r.start();
       rec.current = { rec: r, chunks, stream, started: Date.now() };
       setRecording(true);
+      talkTimer.current = window.setTimeout(() => {
+        flash("45 seconds is the limit — filing what you said.");
+        stopRef.current?.();
+      }, MAX_TALK_MS);
     } catch {
       flash("Microphone blocked — allow it in the browser, or use a scripted line.");
     }
@@ -206,6 +308,10 @@ export default function DeskConsole() {
 
   const stopTalk = useCallback(async () => {
     holding.current = false;
+    if (talkTimer.current) {
+      window.clearTimeout(talkTimer.current);
+      talkTimer.current = null;
+    }
     const cur = rec.current;
     if (!cur) return;
     rec.current = null;
@@ -219,6 +325,10 @@ export default function DeskConsole() {
     const blob = new Blob(cur.chunks, { type: cur.rec.mimeType || "audio/webm" });
     await hear({ audioBase64: await blobToBase64(blob), mimeType: blob.type });
   }, [flash, hear]);
+
+  useEffect(() => {
+    stopRef.current = stopTalk;
+  }, [stopTalk]);
 
   const act: BoardCtx["act"] = useMemo(
     () => ({
@@ -328,6 +438,7 @@ export default function DeskConsole() {
           {voiceReady.key ? "Deepgram voice · live" : "voice key missing — scripted lines file by desk rules"}
         </span>
         <span className={`${css.pill} ${css.pillVeridian}`}>{giveMiamiDay.label}</span>
+        {data.mode === "client" && <span className={css.pill}>desk state lives in this browser</span>}
         {!data.persistence && <span className={`${css.pill} ${css.pillWarn}`}>running from memory</span>}
         {offline && <span className={`${css.pill} ${css.pillWarn}`}>reconnecting…</span>}
       </header>
@@ -357,7 +468,7 @@ export default function DeskConsole() {
           <div className={css.row}>
             <span className={css.label}>Desk node</span>
             <span className={css.hint} style={{ marginLeft: "auto" }}>
-              on-screen node · hardware mirrors it
+              {data.mode === "client" ? "on-screen node · hosted" : "on-screen node · hardware mirrors it"}
             </span>
           </div>
           <div className={css.device}>

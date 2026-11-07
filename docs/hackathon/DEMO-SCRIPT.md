@@ -28,6 +28,10 @@ Every line below has a button in the left panel. The buttons send the exact text
 
 Each **Arm** opens one capture: the line files, the light goes green, then back to idle. Arm again before each line you speak live. The buttons are typed text, so they do not need Arm.
 
+### Hosted copy (Vercel)
+
+Deploy steps are in the root README. The hosted desk behaves the same, with three differences: its state lives in each visitor's browser (press **Reset demo** before you hand a judge the link), the hardware node only pairs with the laptop, and the link to share is the short production domain (`…vercel.app/desk`). Push-to-talk works there too because the site is HTTPS. Run the live stage demo from the laptop.
+
 ## The script
 
 | Time | Do | Say / point at |

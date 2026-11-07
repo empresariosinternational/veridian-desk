@@ -37,4 +37,6 @@ Leave the flame sensor, MQ-2 gas sensor, pump, motor and heart-rate sensor in th
 | `FILED` (about 2.5 s, then `IDLE`) | green | `Filed once - <name>` |
 | any status + urgent | blinks | `URGENT: driver today` until someone accepts the shift |
 
+The node pairs with the laptop (file mode). The hosted Vercel desk keeps state in each browser, so it has no shared state for a node to poll; there the on-screen node is the device.
+
 The state machine follows `docs/node-clip.md`: IDLE → ARMED (consent) → LISTENING → WORKING → FILED → IDLE. Disarm returns to IDLE from anywhere and drops unfiled audio. An armed window that goes unused expires after 2 minutes.
