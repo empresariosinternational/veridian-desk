@@ -16,6 +16,7 @@ const uint8_t SCREEN_HEIGHT = 64;  // Change to 32 for a 128x32 OLED.
 const uint8_t TRIGGER_CM = 20;
 const uint8_t RELEASE_CM = 30;
 const unsigned long SAMPLE_MS = 80;
+const unsigned long RELEASE_MS = 1000;
 const unsigned long HOST_TIMEOUT_MS = 3500;
 
 Adafruit_SSD1306 display(128, SCREEN_HEIGHT, &Wire, -1);
@@ -24,8 +25,9 @@ bool hostConnected = false;
 bool urgent = false;
 bool gestureLatched = false;
 bool gestureTriggered = false;
+bool farPending = false;
 uint8_t nearSamples = 0;
-uint8_t farSamples = 0;
+unsigned long farSince = 0;
 unsigned long lastHost = 0;
 unsigned long lastSample = 0;
 unsigned long lastScreen = 0;
@@ -91,7 +93,7 @@ void sampleSonar(unsigned long now) {
   distanceCm = duration ? duration / 58UL : 0;
 
   if (distanceCm >= 2 && distanceCm <= TRIGGER_CM) {
-    farSamples = 0;
+    farPending = false;
     if (nearSamples < 3) nearSamples++;
     if (nearSamples == 3 && !gestureLatched) {
       // Latch even while disarmed: arming with a hand already present must
@@ -106,10 +108,13 @@ void sampleSonar(unsigned long now) {
     }
   } else {
     nearSamples = 0;
-    // Hysteresis and five clear samples prevent chatter at the boundary.
+    // Keep sampling and servicing USB while timing one continuous second away.
     if (distanceCm == 0 || distanceCm >= RELEASE_CM) {
-      if (farSamples < 5) farSamples++;
-      if (farSamples == 5 && gestureLatched) {
+      if (!farPending) {
+        farPending = true;
+        farSince = now;
+      }
+      if (gestureLatched && now - farSince >= RELEASE_MS) {
         gestureLatched = false;
         // Release must reach the browser even before its LISTENING update
         // arrives (for example, while microphone permission is pending).
@@ -118,7 +123,7 @@ void sampleSonar(unsigned long now) {
           if (hostConnected) Serial.println(F("{\"event\":\"sonar-release\"}"));
         }
       }
-    } else farSamples = 0;
+    } else farPending = false;
   }
 }
 

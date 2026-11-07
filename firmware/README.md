@@ -25,7 +25,7 @@ A5 is the hardware **SCL** pin on these boards. An OLED marked SCK must support 
 3. Run the web app: `cd web && npm install && npm run dev`. Open **http://localhost:3000/desk** in desktop **Chrome or Edge**. A hosted app must use HTTPS; plain HTTP over a LAN IP does not provide the required browser APIs.
 4. Click **Connect Arduino** and select the board's USB serial port. The app sends status heartbeats at **115200 baud**; the board may reset when the port opens.
 5. Select the speaker and spoken language. Click **Arm**, then move your hand **2–20 cm** in front of the sonar. Allow microphone access when the browser asks.
-6. Keep your hand near the sonar while speaking. Move it at least **30 cm** away, or out of sensor range, to **stop and file**. Five clear samples debounce the release (about **400 ms**). **Stop and file** also finishes capture. Browser recognition may end sooner and has a 60-second limit. **Disarm**, loss of browser focus, or USB disconnection discards a pending sonar capture.
+6. Keep your hand near the sonar while speaking. Move it at least **30 cm** away, or out of sensor range, for **one continuous second** to **stop and file**. Bringing it back sooner resets the release timer. **Stop and file** also finishes capture. Browser recognition may end sooner and has a 60-second limit. **Disarm**, loss of browser focus, or USB disconnection discards a pending sonar capture.
 
 Move the hand away (at least **30 cm**, or out of sensor range) before another gesture. Each successful filing consumes the armed window: click Arm again for the next note. An unused arm expires after two minutes. Holding a hand near the sensor before arming does not start capture; move it away and make a fresh gesture. Manual **Hold to talk** remains available without hardware.
 
@@ -56,7 +56,7 @@ Arduino → browser:
 {"event":"sonar-release"}
 ```
 
-The sonar emits a single `sonar` event after **three consecutive near readings**, only when the browser reports `ARMED`. After a triggered gesture, **five consecutive clear readings** (at least 30 cm away or no echo) emit one `sonar-release` event and re-enable the gesture. Release is sent even if the browser has not yet reported `LISTENING`, so moving away during a microphone permission prompt cancels that pending capture. Gestures have a 1.5-second minimum interval. Sampling runs every 80 ms with a bounded 25 ms echo timeout; the 20–30 cm gap provides hysteresis against sensor noise.
+The sonar emits a single `sonar` event after **three consecutive near readings**, only when the browser reports `ARMED`. After a triggered gesture, **one continuous second of clear readings** (at least 30 cm away or no echo) emits one `sonar-release` event and re-enables the gesture. Release is sent even if the browser has not yet reported `LISTENING`, so moving away during a microphone permission prompt cancels that pending capture. Near or intermediate readings reset the release timer. Timing uses elapsed milliseconds without delaying the firmware loop, so sonar sampling, USB commands, LED updates and OLED updates continue during capture. Gestures have a 1.5-second minimum interval. Sampling runs every 80 ms with a bounded 25 ms echo timeout; the 20–30 cm gap provides hysteresis against sensor noise.
 
 Browser → Arduino, on state changes and every second:
 
@@ -70,5 +70,9 @@ STATE|FILED|1|Filed once - Marisol
 Fields: `STATE|status|urgent (0 or 1)|ASCII display text`. Status is `IDLE`, `ARMED`, `LISTENING`, `WORKING`, `FILED` or `OFFLINE`. Text is capped at 44 ASCII characters so even a `LISTENING` frame fits the Uno's 64-byte serial receive buffer. Firmware uses fixed buffers, rejects malformed/oversize commands, and stores constant status strings in flash to leave room for the SSD1306 framebuffer on the Uno/Nano's 2 KB SRAM.
 
 The server's existing `LISTENING` status denotes an armed capture window. The USB bridge displays `ARMED` until browser recognition actually starts, then `LISTENING`. Sonar events stay local to the connected tab; the server never opens a microphone.
+
+## Firmware checks
+
+Run `python3 firmware/tests/sonar_test.py` from the repository root (requires `g++`). This compiles the actual sketch with simulated hardware and checks trigger/release timing, interrupted far readings, long holds, permission prompts, consent and clock rollover. Physical sensor behavior still needs verification on the board.
 
 References: [Arduino Uno I²C pin assignments](https://docs.arduino.cc/retired/boards/arduino-uno-rev3-with-long-pins/), [Adafruit SSD1306 setup](https://learn.adafruit.com/monochrome-oled-breakouts/arduino-library-and-examples), [Chrome Web Serial API](https://developer.chrome.com/docs/capabilities/serial).
