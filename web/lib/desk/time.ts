@@ -22,13 +22,15 @@ const MONTHS = [
 ];
 
 export function todayISO(now: Date = new Date()): string {
-  // en-CA formats as YYYY-MM-DD.
-  return new Intl.DateTimeFormat("en-CA", {
+  // Built from parts so no locale's date pattern (or ICU version) can change it.
+  const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: DESK_TZ,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
-  }).format(now);
+  }).formatToParts(now);
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
+  return `${get("year")}-${get("month")}-${get("day")}`;
 }
 
 function toUTC(iso: string): number {

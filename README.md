@@ -18,6 +18,19 @@ npm run desk:smoke             # runs the whole demo offline and checks it
 
 No key? The desk still runs. Every line files by desk rules and says *voice skipped*.
 
+## Deploy on Vercel
+
+There's still no database on Vercel. Serverless instances share no disk, so on Vercel the browser keeps the desk's JSON (in `localStorage`, like the on-device CRM) and sends it with every request; the server runs the same tools and returns the new state. Every visitor gets their own desk. This switches on by itself when `VERCEL` is set (`DESK_STATE_MODE=file|client` overrides). The hardware node pairs with the laptop, not the hosted desk.
+
+```bash
+cd web
+vercel link --yes --project veridian-desk    # creates/links the veridian-desk project
+vercel env add DEEPGRAM_API_KEY production  # paste the key when asked
+vercel deploy --prod
+```
+
+Share the short production domain the CLI prints as **Aliased** (for example `https://veridian-desk.vercel.app/desk`). The long generated URL sits behind Vercel's default deployment protection.
+
 ## One desk, two sides
 
 | Challenge | Who | What one sentence does |
@@ -43,6 +56,7 @@ mic (push-to-talk, after Arm) or a scripted line
   → /desk                    the board in front changes with the speaker
 ```
 
+- **No shared database anywhere.** Laptop: one JSON file. Vercel: the browser's copy of the same JSON.
 - **Say it once.** Every utterance is keyed by normalized text + speaker + day, and every fact it writes has its own key, so a reworded repeat says “Already filed”.
 - **Truth ledger.** Grant and quarterly text may only carry figures that exist in the ledger (`web/lib/desk/ledger.ts`).
 - **Data classes.** `PUBLIC_COMMUNITY`, `OPERATIONAL`, `DONOR`, `CLINICAL`. Only `PUBLIC_COMMUNITY` crosses between organizations. Its text is built from structured fields and re-checked for names, counseling content, amounts and addresses (`web/lib/desk/privacy.ts`).

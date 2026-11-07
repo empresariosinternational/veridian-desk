@@ -1,6 +1,8 @@
+import type { NextRequest } from "next/server";
+import { checkApiRateLimit, rateLimitResponse } from "@/lib/api-guard";
 import { arm, disarm, nodeView, presence } from "@/lib/desk/node";
 import { deskPayload, NO_STORE } from "@/lib/desk/payload";
-import { mutate } from "@/lib/desk/store";
+import { openDesk } from "@/lib/desk/store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,18 +16,21 @@ type NodeEvent = "arm" | "disarm" | "presence" | "button";
  * - presence: PIR — front-desk banner only, never starts the microphone
  * - button: the physical node's button toggles arm / disarm
  */
-export async function POST(req: Request) {
-  let event: NodeEvent | undefined;
+export async function POST(req: NextRequest) {
+  const rl = checkApiRateLimit(req, "desk");
+  if (rl.ok === false) return rateLimitResponse(rl.retryAfterSec);
+  let body: { event?: NodeEvent; state?: unknown };
   try {
-    event = ((await req.json()) as { event?: NodeEvent }).event;
+    body = await req.json();
   } catch {
     return Response.json({ ok: false, error: "Send JSON: { event }" }, { status: 400, headers: NO_STORE });
   }
+  const event = body.event;
   if (!event || !["arm", "disarm", "presence", "button"].includes(event)) {
     return Response.json({ ok: false, error: "event must be arm, disarm, presence or button" }, { status: 400, headers: NO_STORE });
   }
   const now = new Date();
-  const { state } = await mutate((s) => {
+  const { state } = await openDesk(body.state).mutate((s) => {
     if (event === "arm") arm(s, now);
     else if (event === "disarm") disarm(s, now);
     else if (event === "presence") presence(s, now);
@@ -33,6 +38,6 @@ export async function POST(req: Request) {
     else arm(s, now);
     return true;
   });
-  const compact = new URL(req.url).searchParams.get("view") === "node";
+  const compact = req.nextUrl.searchParams.get("view") === "node";
   return Response.json(compact ? nodeView(state, now) : { ok: true, ...deskPayload(state, now) }, { headers: NO_STORE });
 }

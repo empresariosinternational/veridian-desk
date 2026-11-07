@@ -11,6 +11,8 @@ const LIMITS: Record<string, { max: number; windowMs: number }> = {
   session: { max: 12, windowMs: 60_000 },
   "home-events": { max: 20, windowMs: 60_000 },
   zip: { max: 40, windowMs: 60_000 },
+  desk: { max: 240, windowMs: 60_000 },
+  "desk-hear": { max: 40, windowMs: 60_000 },
 };
 
 export function clientIp(req: NextRequest): string {

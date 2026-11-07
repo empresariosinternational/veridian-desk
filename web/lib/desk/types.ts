@@ -23,6 +23,8 @@ export type ProfileId =
   | "ana"
   | "luis";
 
+export const PROFILE_IDS: ProfileId[] = ["marisol", "denise", "yesenia", "reginald", "owen", "claudette", "beatriz", "ana", "luis"];
+
 export type OrgId = "tidepath" | "mangrove";
 
 export type Side = "B2B" | "B2C";
