@@ -2,7 +2,7 @@
 
 **Say it once. The desk files it, routes the urgent thing the same day, and keeps private things private.**
 
-Veridian Desk is a push-to-talk assistant for nonprofits, communities, and the people in them. Staff and neighbors say each fact once. Deepgram hears them and speaks the confirmation. The desk files the note, merges a duplicate donor before Give Miami Day, turns a workshop request into an approval checklist, keeps counseling detail out of the funder report, and drafts a grant update from a truth ledger. The same network staffs a shift, recruits a person who already offered to help, and lets a second community accept a public same-day need. A sensor node shows when the desk is listening. Voice is Deepgram.
+Veridian Desk is a GPT-powered assistant for nonprofits, communities, and the people in them. Chat with the desk, plan the day's executive tasks, or say a fact once and file it. OpenAI handles chat, planning, transcription, and spoken confirmations. The desk merges duplicate donors, turns workshop requests into approval checklists, keeps counseling detail out of funder reports, and drafts grant updates from a truth ledger. The same network staffs shifts and proposes public needs for both communities to approve.
 
 Built at the DevDay Exchange · Codex Hackathon for Miami's Non-Profits (The LAB Miami, Nov 7–8, 2026) for the six Tidepath Family Alliance challenges and the Mangrove Mews bonus. Veridian is the assistant layer; the web app around it is Agentscene. All people, organizations, schools, donors and amounts in the demo are fictional.
 
@@ -11,12 +11,19 @@ Built at the DevDay Exchange · Codex Hackathon for Miami's Non-Profits (The LAB
 ```bash
 cd web
 npm install
-cp .env.example .env.local     # put DEEPGRAM_API_KEY here, and only here
+cp .env.example .env.local     # set OPENAI_API_KEY here, or export it in your shell
 npm run dev -- -H 0.0.0.0      # http://localhost:3000/desk
 npm run desk:smoke             # runs the whole demo offline and checks it
+npm run desk:test              # OpenAI integration tests using a local API fixture
 ```
 
-No key? The desk still runs. Every line files by desk rules and says *voice skipped*.
+On Vercel, keep the project root at `web/` and set the server-side `OPENAI_API_KEY` environment variable. The same name works locally and in the hosted app. No browser key or `NEXT_PUBLIC_` key is needed. Redeploy after changing hosted environment variables.
+
+Open `/desk` and select a profile. **Chat** supports follow-up questions with a separate conversation per profile. **Plan my day** proposes prioritized tasks with owners, dates, and approval requirements from current desk work. **File a note** updates boards through validated tools. Chat and planning do not file notes or execute proposed tasks; existing approval controls handle offers, workshops, and network matches.
+
+Only `OPENAI_API_KEY` is required. Optional defaults in `web/.env.example` are `OPENAI_MODEL=gpt-4.1-mini`, `OPENAI_TRANSCRIBE_MODEL=gpt-transcribe`, `OPENAI_VOICE_MODEL=gpt-realtime-2.1-mini`, and `OPENAI_VOICE=marin`. The chat model must support the Responses API and Structured Outputs; the voice model must support Realtime audio output.
+
+No key or an upstream outage? Filing still uses the offline desk rules and clearly labels the fallback. Chat and planning show an error without creating records. Spoken-confirmation failures leave successfully filed work intact.
 
 ## One desk, two sides
 
@@ -35,20 +42,24 @@ No key? The desk still runs. Every line files by desk rules and says *voice skip
 
 ```
 mic (push-to-talk, after Arm) or a scripted line
-  → POST /api/desk/hear      Deepgram nova-3 transcribes (scripted text skips this)
-  → web/lib/desk/agent.ts    speaker + language → plan (rules, no model)
+  → POST /api/desk/hear      OpenAI gpt-transcribe (text skips transcription)
+  → web/lib/desk/planner.ts  GPT Responses API → validated chat / executive plan / filing actions
+  → web/lib/desk/agent.ts    executes a validated filing plan, or offline rules on provider failure
   → web/lib/desk/tools.ts    plain functions file the work, keyed so nothing doubles
   → web/data/desk-state.json one JSON file; no database, no login
-  → Deepgram Aura-2          speaks one short confirmation
+  → OpenAI Realtime         speaks one short confirmation for voice/demo input
   → /desk                    the board in front changes with the speaker
 ```
 
 - **Say it once.** Every utterance is keyed by normalized text + speaker + day, and every fact it writes has its own key, so a reworded repeat says “Already filed”.
 - **Truth ledger.** Grant and quarterly text may only carry figures that exist in the ledger (`web/lib/desk/ledger.ts`).
 - **Data classes.** `PUBLIC_COMMUNITY`, `OPERATIONAL`, `DONOR`, `CLINICAL`. Only `PUBLIC_COMMUNITY` crosses between organizations. Its text is built from structured fields and re-checked for names, counseling content, amounts and addresses (`web/lib/desk/privacy.ts`).
-- **Consent.** No always-on microphone. Audio is accepted only after Arm, while push-to-talk is held; it goes to Deepgram and is dropped. Matches stay pending until both orgs accept, and shift offers until the person accepts.
+- **Consent.** No always-on microphone. Audio is accepted only after Arm, while push-to-talk is held; it goes to OpenAI and is not stored by the desk. Spoken confirmations use an AI-generated voice. Matches stay pending until both orgs accept, and shift offers until the person accepts.
+- **Model context.** GPT receives the current request, bounded conversation history, and relevant desk work. Stored clinical notes, family records, donor emails, and gift amounts are excluded. The Responses API uses `store: false`. History stays in browser memory and is cleared by reload or demo reset.
 - **Learning, honestly.** One remembered preference: Marisol's call list grouped by school.
-- **Haitian Creole.** No Deepgram speech-to-text model lists `ht`, so Creole notes are entered by staff.
+- **Haitian Creole.** Live Creole audio has not been verified for this demo; staff can enter notes as text.
+
+The implementation follows the official [Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs), [file transcription](https://developers.openai.com/api/docs/guides/speech-to-text), and [Realtime conversations](https://developers.openai.com/api/docs/guides/realtime-conversations) documentation.
 
 ## Hardware
 

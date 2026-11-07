@@ -31,7 +31,7 @@ Judges fund nonprofits. They have seen chatbots. Win by showing all of this in o
 4. A counselor's note exists once, and the funder view is a redaction.
 5. A second community's agent answers a public need with dual consent.
 6. A physical node shows listening / working / urgent. The laptop still works if the node is unplugged.
-7. **Deepgram is the voice assistant.** It transcribes the utterance and speaks the confirmation. Desk tools file the work. The OpenAI Agents SDK is not required. Do not block the demo on it.
+7. **OpenAI powers the assistant.** GPT handles chat, executive task planning, and validated filing plans. OpenAI also transcribes utterances and speaks confirmations. Desk tools file the work; an Agents SDK is not required.
 
 ## Who it serves
 
@@ -52,11 +52,11 @@ Four automations, both sides:
 ## Secrets
 
 - Never hardcode API keys. Never print them. Never commit them.
-- `DEEPGRAM_API_KEY` comes from `web/.env.local` only. OpenAI is not required for this demo.
+- `OPENAI_API_KEY` comes from the local shell or `web/.env.local`, and the same server-side variable on Vercel. Never expose it with a `NEXT_PUBLIC_` prefix.
 - `.gitignore` already ignores `web/.env`, `web/.env.*` (except `web/.env.example`), and `web/data/desk-state.json`.
 - Add `web/.env.example` with empty values and one-line comments.
-- Deepgram is called only from a server route. The browser never sees the key.
-- If a key is missing, the desk still runs the scripted utterances through the same tools, and the UI says "voice key missing — scripted line used". Do not crash.
+- OpenAI is called only from a server route. The browser never sees the key.
+- If a key is missing, the desk still runs the scripted utterances through the same tools, and the UI labels the offline filing fallback; chat and planning return an error without writing records. Do not crash.
 
 ## Non-negotiables
 
@@ -101,7 +101,7 @@ Say-it-once is an idempotency key: normalized utterance text + speaker + day. A 
 
 Self-learning, demo-honest: tool `rememberPreference`. Seed Marisol with no preference. After the demo clicks "Group call list by school", persist `{ callListGrouping: "school" }` on her profile and show "Veridian remembered". Next render uses it. No other learning system.
 
-Spanish: one live or scripted line must file in Spanish and show the language on the card. Haitian Creole: seed one family marked `ht` with a staff-entered summary. Do not claim live Creole transcription unless you have verified the Deepgram model supports `ht`. If it does not, say so in the UI as "Creole notes are entered by staff".
+Spanish: one live or scripted line must file in Spanish and show the language on the card. Haitian Creole: seed one family marked `ht` with a staff-entered summary. Do not claim live Creole transcription unless you have verified the selected OpenAI model supports `ht`. If it does not, say so in the UI as "Creole notes are entered by staff".
 
 ## Demo script (rehearse this, do not improvise)
 
@@ -139,20 +139,20 @@ Put this in `web/lib/desk/seed.ts`. The truth ledger is the only source of numbe
 
 ```
 Mic or scripted line
-  → POST /api/desk/hear   (Deepgram hears; scripted text skips transcription)
+  → POST /api/desk/hear   (OpenAI transcribes; scripted text skips transcription)
   → desk router + tools in web/lib/desk/tools.ts
   → web/data/desk-state.json
-  → Deepgram speaks one confirmation sentence
+  → OpenAI Realtime speaks one confirmation sentence
   → one screen at /desk
 ```
 
 Hardware is a physical echo of the same state, not a second brain.
 
-- Voice assistant is Deepgram. `/v1/listen` transcribes (`Authorization: Token <key>`, smart format, punctuation, language detect). Deepgram Aura (or the current Deepgram speak endpoint as of November 2026) speaks one short confirmation, for example "Filed once. Driver shift offered to Luis." Verify the speak URL against Deepgram's docs before coding. Do not invent a path.
-- Router: `web/lib/desk/agent.ts` chooses the tool from the speaker name ("This is Marisol") and the utterance. Tools, not seven apps. No OpenAI Agents SDK.
+- OpenAI voice: `/v1/audio/transcriptions` transcribes with `gpt-transcribe`; the Realtime WebSocket API speaks a short confirmation with `gpt-realtime-2.1-mini`. Authentication stays server-side via `OPENAI_API_KEY`. Model overrides are documented in `web/.env.example`.
+- Planner: `web/lib/desk/planner.ts` uses the OpenAI Responses API and a strict schema for reply, tasks, and filing actions. `web/lib/desk/agent.ts` applies validated plans through existing tools and retains the offline rules router. Chat and plan modes discard all filing actions.
 - Tools are plain TypeScript functions. They read and write the JSON store. They return the updated card. They do not call a model.
-- Server route runtime nodejs. Timeout 20s. On timeout or a missing key, run the deterministic fallback that still files the scripted demo lines via the tools, and label the card "filed by desk rules — voice skipped". Scripted lines must succeed offline.
-- `POST /api/desk/hear` accepts either `{ text }` or `{ audioBase64, mimeType }`. Audio goes to Deepgram, then the transcript goes to the router. The response includes the transcript, the cards changed, and the confirmation audio or a URL the page can play.
+- Server route runtime nodejs. Maximum duration 60s; GPT has a 20s timeout, transcription 12s, and spoken output 8s within a 55s overall budget. On timeout or a missing key, run the deterministic fallback that still files the scripted demo lines via the tools, and label the card "filed by desk rules — voice skipped". Scripted lines must succeed offline.
+- `POST /api/desk/hear` accepts either `{ text }` or `{ audioBase64, mimeType }`. Audio goes to OpenAI, then the transcript goes to the GPT planner. Text requests also accept `mode: chat | plan | file` and bounded `messages` history. The response includes the transcript, the cards changed, and the confirmation audio or a URL the page can play.
 - `GET /api/desk/state` returns boards, node state, preferences, match proposals.
 - `POST /api/desk/node` accepts `{ event: "arm" | "disarm" | "presence" }`. Arm starts LISTENING. Disarm returns IDLE and drops any unfiled audio. Presence (PIR) only adds a front-desk banner "Someone is at the desk" — it does not start the microphone.
 - `POST /api/desk/match/accept` with the proposal id. Both orgs must be in the payload check: class is `PUBLIC_COMMUNITY` or the route rejects.
@@ -163,7 +163,7 @@ Client page `web/app/desk/page.tsx` is a client console. Boards: Calls, Donors, 
 
 Kit: SunFounder Universal Maker Sensor Kit, ASIN B0D3GWJK82. It includes sensors and an OLED. It does **not** include a Pico, ESP32, or Arduino, and it has **no microphone**. Do not try to do speech-to-text on the kit.
 
-Voice in and voice out are the laptop plus Deepgram. The node displays state and sends arm / disarm / presence.
+Voice in and voice out are the laptop plus OpenAI. The node displays state and sends arm / disarm / presence.
 
 Use only: button or touch (arm/disarm), RGB LED or traffic light (idle white/off, listening red, working amber, filed green, urgent blink), SSD1306 OLED or LCD1602 (one status line), PIR HC-SR501 (presence only), passive buzzer (one short chirp on Owen's urgent card). Skip everything else.
 
@@ -206,7 +206,7 @@ Do not edit the scene digest, CRM storage format, or social-scene store except a
 
 1. Types, seed, store, privacy, tools, fallback. Scripted Marisol line files once and the repeat is ignored. Prove with a small node script or a route test you can run.
 2. `/desk` UI reading `GET /api/desk/state`, scripted buttons calling fallback so the demo already works.
-3. Deepgram on the same tools: transcribe push-to-talk, route, speak the one-sentence confirmation. Same cards if the key is missing.
+3. OpenAI on the same tools: transcribe push-to-talk, route, speak the one-sentence confirmation. Same cards if the key is missing.
 4. Node LED/OLED echo, or skip if no board.
 5. Shift accept on Luis's desk, org-match accept, funder toggle, Give Miami Day line.
 6. `npm run build` in `web/`. Fix type errors you created.
@@ -226,7 +226,7 @@ Do not edit the scene digest, CRM storage format, or social-scene store except a
 - `npm run build` succeeds.
 - README or DEMO-SCRIPT includes this submission blurb, unchanged in substance:
 
-> Veridian Desk is a push-to-talk assistant for nonprofits, communities, and the people in them. Staff and neighbors say each fact once. Deepgram hears them and speaks the confirmation. The desk files the note, merges a duplicate donor before Give Miami Day, turns a workshop request into an approval checklist, keeps counseling detail out of the funder report, and drafts a grant update from a truth ledger. The same network staffs a shift, recruits a person who already offered to help, and lets a second community accept a public same-day need. A sensor node shows when the desk is listening. Voice is Deepgram.
+> Veridian Desk is a push-to-talk assistant for nonprofits, communities, and the people in them. Staff and neighbors say each fact once. OpenAI transcribes their speech, plans filing actions with GPT, and speaks the confirmation. The desk files the note, merges a duplicate donor before Give Miami Day, turns a workshop request into an approval checklist, keeps counseling detail out of the funder report, and drafts a grant update from a truth ledger. The same network staffs a shift, recruits a person who already offered to help, and lets a second community accept a public same-day need. A sensor node shows when the desk is listening. Chat, executive task planning, and voice use OpenAI.
 
 ## Out of scope
 
@@ -234,4 +234,4 @@ Payments, ticketing, eBay-style checkout, wallets, Solana, login, a mobile app, 
 
 ## When you finish
 
-Report: files added, how to run, whether Deepgram listen and speak are live or the scripted fallback is on, hardware status. Do not claim a sensor works if it is not wired.
+Report: files added, how to run, whether OpenAI chat, planning, transcription and speech are live or the scripted fallback is on, hardware status. Do not claim a sensor works if it is not wired.

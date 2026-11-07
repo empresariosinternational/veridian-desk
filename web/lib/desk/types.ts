@@ -375,7 +375,7 @@ export type ToolResult = {
   cards: CardRef[];
   /** On-screen confirmation. */
   say: string;
-  /** One short spoken sentence for Deepgram to read back. */
+  /** One short spoken sentence for OpenAI to read back. */
   spoken: string;
   /** True when every effect of this call already existed (say-it-once). */
   deduped: boolean;
@@ -389,6 +389,11 @@ export type HearInput = {
   now?: Date;
 };
 
+export type AssistantMode = "chat" | "plan" | "file";
+export type AssistantMessage = { role: "user" | "assistant"; text: string };
+export type ExecutiveTask = { title: string; owner: ProfileId; dueBy: string | null; priority: "urgent" | "normal"; requiresApproval: boolean };
+export type AssistantPlan = { reply: string; lang: Lang; tasks: ExecutiveTask[]; actions: ToolCall[] };
+
 export type HearOutcome = {
   ok: boolean;
   alreadyFiled: boolean;
@@ -398,6 +403,6 @@ export type HearOutcome = {
   cards: CardRef[];
   say: string;
   spoken: string;
-  route: "script" | "rules" | "note";
+  route: "gpt" | "script" | "rules" | "note";
   scriptId: string | null;
 };

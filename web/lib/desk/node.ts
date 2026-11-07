@@ -5,7 +5,7 @@
  *
  * - Arm is the consent step. It opens one capture window (LISTENING, red).
  *   The microphone itself only opens while push-to-talk is held.
- * - WORKING (amber) while Deepgram transcribes and the desk files.
+ * - WORKING (amber) while OpenAI transcribes/plans and the desk files.
  * - FILED (green) for a moment, then IDLE. Raw audio is dropped at FILED.
  * - Disarm returns to IDLE from anywhere and drops any unfiled audio.
  * - An armed window that is never used expires back to IDLE.

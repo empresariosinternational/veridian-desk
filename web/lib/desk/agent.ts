@@ -1,6 +1,6 @@
 /**
  * Desk router. Chooses tools from the speaker ("This is Marisol") and the
- * utterance. Rules, not a model: it is deterministic, offline and auditable.
+ * utterance when OpenAI is unavailable. Validated GPT plans use the same tools.
  *
  *   utterance → speaker + language → plan (script table or rules) → tools
  *             → say-it-once key → cards → one spoken confirmation
@@ -9,7 +9,7 @@
 import { matchScripted, normalize } from "./fallback";
 import { pushFeed, runPlan } from "./tools";
 import { addDays, endOfWorkWeek, lastWeekday, monthIndex, nextWeekday, todayISO, weekdayIndex, weekdayOf } from "./time";
-import type { CardRef, DeskState, HearInput, HearOutcome, Lang, ProfileId, ToolCall } from "./types";
+import type { AssistantPlan, CardRef, DeskState, HearInput, HearOutcome, Lang, ProfileId, ToolCall } from "./types";
 
 const PROFILE_BY_NAME: Record<string, ProfileId> = {
   marisol: "marisol",
@@ -222,8 +222,8 @@ export function filedKey(speaker: ProfileId, day: string, text: string): string 
   return `${speaker}|${day}|${normalize(text)}`;
 }
 
-/** Hear one utterance and file it. Mutates `s`. Never calls a model. */
-export function processUtterance(s: DeskState, input: HearInput): HearOutcome {
+/** File a validated plan, or use offline rules. Network calls happen before the store transaction. */
+export function processUtterance(s: DeskState, input: HearInput, assistantPlan?: AssistantPlan): HearOutcome {
   const now = input.now ?? new Date();
   const today = todayISO(now);
   const raw = input.text.replace(/\s+/g, " ").trim().slice(0, 600);
@@ -258,7 +258,12 @@ export function processUtterance(s: DeskState, input: HearInput): HearOutcome {
     scriptId = scripted.line.id;
     route = "script";
   };
-  if (scripted && scripted.score === 1) {
+  if (assistantPlan) {
+    plan = assistantPlan.actions;
+    lang = assistantPlan.lang;
+    route = "gpt";
+    if (scripted?.score === 1) scriptId = scripted.line.id;
+  } else if (scripted && scripted.score === 1) {
     useScript();
   } else {
     if (speaker) plan = parseUtterance(detected.body, speaker, today, lang);
@@ -271,6 +276,11 @@ export function processUtterance(s: DeskState, input: HearInput): HearOutcome {
   }
   if (!speaker) {
     return { ...empty, lang, say: "Say who is speaking first — for example “This is Owen…” — or pick a profile." };
+  }
+
+  // Questions and planning responses never create a filed record or a note.
+  if (assistantPlan && !plan.length) {
+    return { ...empty, ok: true, speaker, lang, say: assistantPlan.reply, spoken: assistantPlan.reply.slice(0, 400), route: "gpt", scriptId: null };
   }
 
   const key = filedKey(speaker, today, canonical);

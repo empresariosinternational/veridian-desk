@@ -1,59 +1,51 @@
+import { z } from "zod";
 import { detectSpeaker, processUtterance } from "@/lib/desk/agent";
-import { deepgramKey, speak, transcribe, VoiceError } from "@/lib/desk/deepgram";
+import { aiError, assistantModel, openaiKey, speak, supportedAudio, transcribe } from "@/lib/desk/openai";
+import { planUtterance, validatePlan } from "@/lib/desk/planner";
 import { failSoft, filed, working } from "@/lib/desk/node";
 import { deskPayload, isProfileId, NO_STORE } from "@/lib/desk/payload";
 import { mutate } from "@/lib/desk/store";
-import type { Lang, ProfileId, Source } from "@/lib/desk/types";
+import type { AssistantPlan, HearOutcome, Lang, ProfileId, Source } from "@/lib/desk/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 20;
+export const maxDuration = 60;
 
 type VoiceStep = "live" | "skipped" | "missing-key" | "timeout" | "error";
+const bodySchema = z.object({
+  text: z.string().max(600).optional(),
+  audioBase64: z.string().max(4_000_000).optional(),
+  mimeType: z.string().max(100).default("audio/webm"),
+  profileHint: z.string().optional(),
+  source: z.enum(["typed", "script"]).default("typed"),
+  mode: z.enum(["chat", "plan", "file"]).default("file"),
+  messages: z.array(z.object({ role: z.enum(["user", "assistant"]), text: z.string().min(1).max(2400) }).strict()).max(12).default([]),
+});
 
-type Body = {
-  text?: string;
-  audioBase64?: string;
-  mimeType?: string;
-  profileHint?: string;
-  source?: Source;
-};
+const BUDGET_MS = 55_000;
+const MAX_AUDIO_BYTES = 3_000_000;
 
-const BUDGET_MS = 19_000;
-const MAX_AUDIO_BYTES = 4_000_000;
-
-/**
- * POST /api/desk/hear  { text } | { audioBase64, mimeType }
- *
- * Mic or scripted line → Deepgram hears (scripted text skips transcription)
- * → desk router + tools → web/data/desk-state.json → Deepgram speaks one
- * confirmation sentence. Audio is forwarded to Deepgram and dropped; only the
- * filed transcript is kept. Missing key or timeout: the desk still files by
- * its rules and says so.
- */
+/** Text or armed push-to-talk → GPT chat/plan → validated filing tools → optional voice. */
 export async function POST(req: Request) {
   const started = Date.now();
-  let body: Body;
+  let body: z.infer<typeof bodySchema>;
   try {
-    body = await req.json();
+    const parsed = bodySchema.safeParse(await req.json());
+    if (!parsed.success) throw new Error("invalid body");
+    body = parsed.data;
   } catch {
-    return Response.json({ ok: false, notice: "Send JSON: { text } or { audioBase64, mimeType }." }, { status: 400, headers: NO_STORE });
+    return Response.json({ ok: false, notice: "Send { text } or { audioBase64, mimeType }, a valid mode (chat, plan, file), and up to 12 messages." }, { status: 400, headers: NO_STORE });
   }
   const hint: ProfileId | undefined = isProfileId(body.profileHint) ? body.profileHint : undefined;
-  const hasKey = Boolean(deepgramKey());
-  const voice: { heard: VoiceStep; spoke: VoiceStep; notice: string | null; via: string } = {
-    heard: "skipped",
-    spoke: "skipped",
-    notice: null,
-    via: "",
-  };
-  let text = typeof body.text === "string" ? body.text.slice(0, 600) : "";
+  const hasKey = Boolean(openaiKey());
+  const voice: { heard: VoiceStep; spoke: VoiceStep; notice: string | null; via: string } = { heard: "skipped", spoke: "skipped", notice: null, via: "" };
+  let text = body.text?.trim() ?? "";
   let lang: Lang | undefined;
-  let source: Source = body.source === "typed" ? "typed" : "script";
+  let source: Source = body.source;
 
-  const soft = async (notice: string, line: string, status = 200) => {
+  const soft = async (notice: string, status = 200) => {
     const { state } = await mutate((s) => {
-      failSoft(s, line, new Date());
+      failSoft(s, "Try again", new Date());
       return true;
     });
     return Response.json({ ok: false, notice, voice, ...deskPayload(state, new Date()) }, { status, headers: NO_STORE });
@@ -63,85 +55,103 @@ export async function POST(req: Request) {
     source = "voice";
     if (!hasKey) {
       voice.heard = "missing-key";
-      return soft("voice key missing — use a scripted line", "Voice key missing");
+      return soft("OPENAI_API_KEY is missing on the server — type a note or use a demo line.", 503);
     }
-    // Consent gate: audio is accepted only inside an armed capture window.
+    if (!supportedAudio(body.mimeType)) return soft("Use a WebM, MP4, MP3, M4A, or WAV recording.", 400);
+    const audio = Buffer.from(body.audioBase64, "base64");
+    if (!audio.length) return soft("That audio clip is empty.", 400);
+    if (audio.length > MAX_AUDIO_BYTES) return soft("That clip is too long — keep it under a minute.", 413);
+    // The existing consent gate applies before any audio is forwarded.
     const gate = await mutate((s) => {
       if (s.node.status !== "LISTENING" && s.node.status !== "ARMED") return false;
       working(s, hint ? s.profiles[hint].name : "voice", new Date());
       return true;
     });
     if (!gate.result) {
-      return Response.json(
-        { ok: false, notice: "Arm the desk first — the microphone only opens after Arm.", voice, ...deskPayload(gate.state, new Date()) },
-        { status: 409, headers: NO_STORE },
-      );
+      return Response.json({ ok: false, notice: "Arm the desk first — the microphone only opens after Arm.", voice, ...deskPayload(gate.state, new Date()) }, { status: 409, headers: NO_STORE });
     }
-    const audio = Buffer.from(body.audioBase64, "base64");
-    if (audio.length > MAX_AUDIO_BYTES) return soft("That clip is too long — keep it under a minute.", "Try again", 413);
     try {
-      const heard = await transcribe(audio, body.mimeType ?? "audio/webm", 12_000);
-      text = heard.transcript;
+      const heard = await transcribe(audio, body.mimeType);
+      text = heard.transcript.slice(0, 600);
       lang = heard.lang;
       voice.heard = "live";
-    } catch (e) {
-      const kind = e instanceof VoiceError ? e.kind : "error";
-      voice.heard = kind === "timeout" ? "timeout" : "error";
-      return soft(
-        kind === "empty" ? "Didn't hear any speech — hold the button while you talk." : "Deepgram didn't answer — use a scripted line.",
-        "Try again — didn't catch that",
-      );
+    } catch (error) {
+      const failure = aiError(error);
+      voice.heard = failure.kind === "timeout" ? "timeout" : "error";
+      return soft(failure.kind === "empty" ? "Didn't hear any speech — hold the button while you talk." : failure.message, 502);
     }
-  } else if (!text.trim()) {
-    return Response.json({ ok: false, notice: "Nothing to file." }, { status: 400, headers: NO_STORE });
-  } else {
-    const who = detectSpeaker(text).speaker ?? hint;
-    await mutate((s) => {
-      working(s, who ? s.profiles[who].name : "desk", new Date());
-      return true;
-    });
+  } else if (!text) {
+    return Response.json({ ok: false, notice: "Enter a message first." }, { status: 400, headers: NO_STORE });
   }
 
-  // File it. Tools are plain functions over the JSON store.
-  let outcome;
-  try {
-    ({ result: outcome } = await mutate((s) => processUtterance(s, { text, lang, source, profileHint: hint, now: new Date() })));
-  } catch (e) {
-    return soft(`The desk could not file that (${String(e).slice(0, 80)}).`, "Try again");
-  }
-
-  // Speak one short confirmation.
-  let speech: { audioBase64: string; mimeType: string } | null = null;
-  if (outcome.ok && outcome.spoken) {
-    if (!hasKey) {
-      voice.spoke = "missing-key";
-      voice.notice = "voice key missing — scripted line used";
-    } else {
-      const remaining = BUDGET_MS - (Date.now() - started);
-      if (remaining > 1_500) {
-        try {
-          speech = await speak(outcome.spoken, outcome.lang, Math.min(6_000, remaining - 500));
-          voice.spoke = "live";
-        } catch (e) {
-          voice.spoke = e instanceof VoiceError && e.kind === "timeout" ? "timeout" : "error";
-        }
-      } else {
-        voice.spoke = "timeout";
-      }
-    }
-  }
-  voice.via = voice.heard === "live" || voice.spoke === "live" ? "Deepgram voice" : "filed by desk rules — voice skipped";
-
-  const { state } = await mutate((s) => {
-    const who = outcome.speaker !== "unknown" ? s.profiles[outcome.speaker]?.name ?? "desk" : "desk";
-    if (outcome.ok) filed(s, outcome.alreadyFiled ? `Already filed — ${who}` : `Filed once — ${who}`, new Date());
-    else failSoft(s, "Try again", new Date());
-    if (outcome.ok && s.feed[0]) s.feed[0].via = `${source} · ${voice.via}`;
+  const who = detectSpeaker(text).speaker ?? hint;
+  if (!who) return soft("Pick a profile or say who is speaking first.", 400);
+  const now = new Date();
+  const input = { text, lang, source, profileHint: who, now };
+  const { state: snapshot } = await mutate((s) => {
+    working(s, s.profiles[who].name, now);
     return true;
   });
 
-  return Response.json(
-    { ok: outcome.ok, outcome, transcript: text, speech, voice, notice: outcome.ok ? voice.notice : outcome.say, ...deskPayload(state, new Date()) },
-    { headers: NO_STORE },
-  );
+  let plan: AssistantPlan | undefined;
+  let assistantNotice: string | null = null;
+  try {
+    ({ plan } = await planUtterance(snapshot, input, body.mode, body.messages, Math.min(20_000, BUDGET_MS - (Date.now() - started) - 1000)));
+  } catch (error) {
+    const failure = aiError(error);
+    // Offline filing preserves the demo. Chat/plan errors never become filed notes.
+    if (body.mode !== "file" || !["missing-key", "timeout", "http"].includes(failure.kind)) {
+      return soft(failure.message, failure.kind === "missing-key" ? 503 : failure.kind === "timeout" ? 504 : 502);
+    }
+    assistantNotice = `${failure.message} Filed using desk rules.`;
+  }
+
+  let outcome: HearOutcome;
+  try {
+    ({ result: outcome } = await mutate((s) => {
+      if (plan) validatePlan(plan, s, who, body.mode);
+      return processUtterance(s, input, plan);
+    }));
+  } catch {
+    return soft("The desk could not file that. Nothing was confirmed; try again.", 500);
+  }
+
+  let speech: { audioBase64: string; mimeType: string } | null = null;
+  if (outcome.ok && outcome.spoken && source !== "typed") {
+    if (!hasKey) {
+      voice.spoke = "missing-key";
+    } else {
+      const remaining = BUDGET_MS - (Date.now() - started);
+      if (remaining > 1500) {
+        try {
+          speech = await speak(outcome.spoken, outcome.lang, Math.min(8_000, remaining - 500));
+          voice.spoke = "live";
+        } catch (error) {
+          voice.spoke = aiError(error).kind === "timeout" ? "timeout" : "error";
+          voice.notice = "Spoken confirmation is unavailable. The response is shown below.";
+        }
+      } else {
+        voice.spoke = "timeout";
+        voice.notice = "Spoken confirmation timed out. The response is shown below.";
+      }
+    }
+  }
+  voice.via = plan ? "OpenAI GPT" : "filed by desk rules";
+  if (voice.heard === "live" || voice.spoke === "live") voice.via += " · OpenAI voice";
+  else if (source !== "typed") voice.via += " — voice skipped";
+
+  const { state } = await mutate((s) => {
+    const name = s.profiles[who].name;
+    if (outcome.ok) filed(s, plan && !plan.actions.length ? `Replied — ${name}` : outcome.alreadyFiled ? `Already filed — ${name}` : `Filed once — ${name}`, new Date());
+    else failSoft(s, "Try again", new Date());
+    if (outcome.ok && outcome.cards.length && s.feed[0]) s.feed[0].via = `${source} · ${voice.via}`;
+    return true;
+  });
+
+  return Response.json({
+    ok: outcome.ok, outcome, transcript: text, speech, voice,
+    assistant: { status: plan ? "live" : "fallback", model: plan ? assistantModel() : null, reply: outcome.say, tasks: plan?.tasks ?? [], notice: assistantNotice },
+    notice: outcome.ok ? assistantNotice ?? voice.notice : outcome.say,
+    ...deskPayload(state, new Date()),
+  }, { headers: NO_STORE });
 }

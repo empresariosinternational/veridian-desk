@@ -7,18 +7,24 @@
     "build": "next build",
     "start": "next start",
     "refresh-data": "python3 ../luma-scene/luma_scene.py run && cp ../luma-scene/out/data.json public/data.json",
-    "desk:smoke": "npx --yes tsx scripts/desk-smoke.ts"
+    "desk:smoke": "tsx scripts/desk-smoke.ts",
+    "desk:test": "tsx --test scripts/desk-openai.test.ts"
   },
   "dependencies": {
     "framer-motion": "^12.40.0",
     "next": "16.2.7",
+    "openai": "^7.53.0",
     "react": "19.0.0",
-    "react-dom": "19.0.0"
+    "react-dom": "19.0.0",
+    "ws": "^8.22.1",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/node": "22.9.0",
     "@types/react": "19.0.0",
     "@types/react-dom": "19.0.0",
+    "@types/ws": "^8.18.2",
+    "tsx": "^4.23.15",
     "typescript": "5.6.3"
   }
 }

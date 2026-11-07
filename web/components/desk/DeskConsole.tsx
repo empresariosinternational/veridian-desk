@@ -6,7 +6,8 @@ import { SCRIPT } from "@/lib/desk/fallback";
 import { fmtTime } from "@/lib/desk/time";
 import type { DeskPayload } from "@/lib/desk/payload";
 import type { FunderView } from "@/lib/desk/privacy";
-import type { BoardId, CardRef, HearOutcome, OrgId, ProfileId } from "@/lib/desk/types";
+import type { AssistantMode, AssistantMessage, BoardId, CardRef, ExecutiveTask, HearOutcome, OrgId, ProfileId } from "@/lib/desk/types";
+import DeskAssistant from "./DeskAssistant";
 import { Board, type BoardCtx, type SentenceCheck } from "./DeskBoards";
 import css from "./DeskConsole.module.css";
 
@@ -19,6 +20,7 @@ type HearResponse = Partial<DeskPayload> & {
   speech?: { audioBase64: string; mimeType: string } | null;
   voice?: Voice;
   notice?: string | null;
+  assistant?: { status: "live" | "fallback"; reply: string; tasks: ExecutiveTask[] };
 };
 
 type Last = { transcript: string; outcome: HearOutcome | null; voice: Voice | null; notice: string | null; at: number };
@@ -35,7 +37,7 @@ const CLOSE_LINE = "Said once. Filed once. The right person and the other commun
 
 function pickMime(): string | undefined {
   if (typeof MediaRecorder === "undefined") return undefined;
-  for (const m of ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg;codecs=opus"]) {
+  for (const m of ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"]) {
     if (MediaRecorder.isTypeSupported(m)) return m;
   }
   return undefined;
@@ -63,6 +65,7 @@ export default function DeskConsole() {
   const [hotCards, setHotCards] = useState<CardRef[]>([]);
   const [resetArmed, setResetArmed] = useState(false);
   const [done, setDone] = useState<Set<string>>(new Set());
+  const [assistantEpoch, setAssistantEpoch] = useState(0);
 
   const lastWrite = useRef(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -149,13 +152,15 @@ export default function DeskConsole() {
   }, []);
 
   const hear = useCallback(
-    async (payload: { text?: string; audioBase64?: string; mimeType?: string; source?: "script" | "typed" }) => {
+    async (payload: { text?: string; audioBase64?: string; mimeType?: string; source?: "script" | "typed"; mode?: AssistantMode; messages?: AssistantMessage[] }): Promise<HearResponse | null> => {
       setBusy("hear");
+      audioRef.current?.pause();
+      audioRef.current = null;
       const j = await post<HearResponse>("/api/desk/hear", { ...payload, profileHint: active });
       setBusy(null);
-      if (!j) return;
+      if (!j) return null;
       apply(j);
-      setLast({ transcript: j.transcript ?? payload.text ?? "", outcome: j.outcome ?? null, voice: j.voice ?? null, notice: j.notice ?? null, at: Date.now() });
+      if (payload.source !== "typed" || payload.mode === "file") setLast({ transcript: j.transcript ?? payload.text ?? "", outcome: j.outcome ?? null, voice: j.voice ?? null, notice: j.notice ?? null, at: Date.now() });
       if (j.outcome?.ok) {
         if (j.outcome.speaker !== "unknown") setActive(j.outcome.speaker);
         showCards(j.outcome.cards);
@@ -166,6 +171,7 @@ export default function DeskConsole() {
         audioRef.current = a;
         a.play().catch(() => undefined);
       }
+      return j;
     },
     [active, apply, flash, post, showCards],
   );
@@ -182,7 +188,7 @@ export default function DeskConsole() {
   const startTalk = useCallback(async () => {
     holding.current = true;
     if (rec.current || !data) return;
-    if (!data.voiceReady.key) return flash("voice key missing — use a scripted line");
+    if (!data.voiceReady.key) return flash("OpenAI key missing — type a note or use a demo line");
     if (!data.node.armed) return flash("Arm the desk first — consent comes before the mic.");
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -280,6 +286,7 @@ export default function DeskConsole() {
       apply(j);
       setLast(null);
       setDone(new Set());
+      setAssistantEpoch((epoch) => epoch + 1);
       setActive("marisol");
       setFunderOn(false);
       flash("Desk reset to the seed.");
@@ -325,7 +332,7 @@ export default function DeskConsole() {
           </div>
         </div>
         <span className={`${css.pill} ${voiceReady.key ? css.pillOk : css.pillWarn}`}>
-          {voiceReady.key ? "Deepgram voice · live" : "voice key missing — scripted lines file by desk rules"}
+          {voiceReady.key ? "OpenAI GPT · ready" : "OpenAI key missing — filing uses desk rules"}
         </span>
         <span className={`${css.pill} ${css.pillVeridian}`}>{giveMiamiDay.label}</span>
         {!data.persistence && <span className={`${css.pill} ${css.pillWarn}`}>running from memory</span>}
@@ -342,6 +349,7 @@ export default function DeskConsole() {
                 type="button"
                 className={`${css.chip} ${active === id ? css.chipActive : ""}`}
                 aria-pressed={active === id}
+                disabled={busy === "hear"}
                 onClick={() => setActive(id)}
               >
                 <strong>{state.profiles[id].name}</strong> · {state.profiles[id].role}
@@ -354,6 +362,7 @@ export default function DeskConsole() {
 
       <div className={css.grid}>
         <aside className={`${css.panel} ${css.sticky}`} aria-label="desk node">
+          <DeskAssistant key={assistantEpoch} active={active} profiles={state.profiles} busy={busy === "hear"} onSend={hear} />
           <div className={css.row}>
             <span className={css.label}>Desk node</span>
             <span className={css.hint} style={{ marginLeft: "auto" }}>
@@ -410,7 +419,7 @@ export default function DeskConsole() {
             {recording ? "● Listening — release to file" : node.armed ? "Hold to talk" : "Arm first, then hold to talk"}
           </button>
           <p className={css.hint}>
-            Push-to-talk only. No always-on microphone, no room recording. Audio goes to Deepgram and is dropped; only the filed note is kept.
+            Push-to-talk only. No always-on microphone, no room recording. Audio goes to OpenAI and is not stored by the desk. Spoken confirmations use an AI-generated voice.
             {!voiceReady.creoleLive && " Creole notes are entered by staff."}
           </p>
 
@@ -472,7 +481,7 @@ export default function DeskConsole() {
             </button>
           </div>
           <div className={css.row}>
-            <button type="button" className={`${css.btn} ${css.btnGhost} ${css.btnSmall}`} onClick={reset}>
+            <button type="button" className={`${css.btn} ${css.btnGhost} ${css.btnSmall}`} onClick={reset} disabled={busy === "hear"}>
               {resetArmed ? "Click again to reset the demo" : "Reset demo"}
             </button>
           </div>

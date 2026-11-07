@@ -5,28 +5,32 @@ Submit on DeepStation by **Sunday, Nov 8, 4:45 PM ET**. Be in the room at **4:30
 
 ## DeepStation blurb
 
-Veridian Desk is a push-to-talk assistant for nonprofits, communities, and the people in them. Staff and neighbors say each fact once. Deepgram hears them and speaks the confirmation. The desk files the note, merges a duplicate donor before Give Miami Day, turns a workshop request into an approval checklist, keeps counseling detail out of the funder report, and drafts a grant update from a truth ledger. The same network staffs a shift, recruits a person who already offered to help, and lets a second community accept a public same-day need. A sensor node shows when the desk is listening. Voice is Deepgram.
+Veridian Desk is a push-to-talk assistant for nonprofits, communities, and the people in them. Staff and neighbors say each fact once. OpenAI transcribes their speech, plans the filing actions with GPT, and speaks the confirmation. The desk files the note, merges a duplicate donor before Give Miami Day, turns a workshop request into an approval checklist, keeps counseling detail out of the funder report, and drafts a grant update from a truth ledger. The same network staffs a shift, recruits a person who already offered to help, and lets a second community accept a public same-day need. A sensor node shows when the desk is listening. Chat, executive task planning, and voice use OpenAI.
 
 ## Run it
 
 ```bash
 cd web
 npm install
-cp .env.example .env.local      # put DEEPGRAM_API_KEY in .env.local only
+cp .env.example .env.local      # set OPENAI_API_KEY here, or export it in your shell
 npm run dev -- -H 0.0.0.0       # -H lets the hardware node reach the laptop
 # open http://localhost:3000/desk
 ```
 
 Before you go on:
 
-1. The header pill must say **Deepgram voice · live**. If it says *voice key missing*, the demo still works: every line files by desk rules and the card says *voice skipped*.
+1. The header pill should say **OpenAI GPT · ready** when the server key is configured. Verify connectivity with a chat message. With no key, filing still uses desk rules and chat/planning show a missing-key message.
 2. Do one live test so the browser asks for the microphone now, not on stage: **Arm**, hold **Hold to talk**, say “This is Ana. Testing the desk.”, release, and listen for the spoken confirmation.
 3. Press **Reset demo** twice (the second click confirms). The desk is back to the seed.
-4. Laptop volume up. The confirmation is spoken by Deepgram.
+4. Laptop volume up. OpenAI speaks the confirmation with an AI-generated voice.
 
 Every line below has a button in the left panel. The buttons send the exact text through the same pipeline as the mic (`POST /api/desk/hear`), so a loud room cannot kill the demo. Speak a line live when the room is quiet. Use the button when it is not.
 
 Each **Arm** opens one capture: the line files, the light goes green, then back to idle. Arm again before each line you speak live. The buttons are typed text, so they do not need Arm.
+
+## Chat and executive planning
+
+Select **Owen**, send “What needs attention today?” in Chat, then ask a follow-up. After filing the driver need, press **Plan my day**: point to the priority, owner, date, and approval requirement. No records change until staff use **File a note** or the existing approval buttons. Conversations are separate for each profile.
 
 ## The script
 
@@ -51,14 +55,14 @@ Each **Arm** opens one capture: the line files, the light goes green, then back 
 - **“Is the funder view just hidden text?”** No. `GET /api/desk/state?view=funder` is a server-side projection: CLINICAL text never leaves the server in that view.
 - **“What crosses between organizations?”** Only `PUBLIC_COMMUNITY`, built from structured fields (org, kind, area, day). `POST /api/desk/match/accept` re-checks and rejects names, counseling content, amounts and addresses.
 - **“Does it learn?”** One honest thing: Marisol clicks *Group call list by school* once, and the desk remembers it on her profile (`rememberPreference`). Nothing else is learned.
-- **“Haitian Creole?”** No Deepgram speech-to-text model lists Haitian Creole (`ht`), so Creole notes are entered by staff. The Jean-Baptiste household shows how.
-- **“Where's the AI?”** Deepgram hears and speaks. The desk router and tools are deterministic rules, so every filing is auditable and works offline.
+- **“Haitian Creole?”** Live Creole audio has not been verified for this demo, so Creole notes are entered by staff. The Jean-Baptiste household shows how.
+- **“Where's the AI?”** GPT handles multi-turn chat, executive task planning, and structured filing plans. OpenAI also transcribes and speaks. Filing tools enforce deduplication, privacy, the ledger and consent; offline rules preserve the demo if OpenAI is unavailable.
 
 ## If something breaks
 
 | Problem | What happens / do this |
 |---|---|
-| No key or Deepgram times out | Lines still file; the card says *filed by desk rules — voice skipped*. Keep going with the buttons. |
+| No key or OpenAI times out | Lines still file; the card says *filed by desk rules — voice skipped*. Keep going with the buttons. |
 | Mic blocked | Use the buttons. |
 | Node unplugged or Wi-Fi down | The on-screen node is the device. The laptop does not depend on it. |
 | Demo state is messy | **Reset demo** (two clicks). State lives in `web/data/desk-state.json`. |
@@ -67,12 +71,12 @@ Prove it before you go on: `cd web && npm run desk:smoke` runs this whole script
 
 ## What is real and what is demo
 
-- Real: push-to-talk capture, Deepgram nova-3 transcription and Aura-2 speech, say-it-once keys, the truth-ledger guard, server-side funder redaction, the public-only network check, dual-consent accept, B2C accept/decline, the JSON store, and the node protocol.
+- Real: push-to-talk capture, GPT Responses API chat/planning, OpenAI file transcription and Realtime speech, say-it-once keys, the truth-ledger guard, server-side funder redaction, the public-only network check, dual-consent accept, B2C accept/decline, the JSON store, and the node protocol.
 - Demo: all people, organizations, schools, donors and amounts are fictional. Tidepath Family Alliance and Mangrove Mews are made up.
 
 ## Submission checklist
 
 - [ ] Public GitHub repo with an MIT or Apache-2.0 license (see `docs/hackathon/LICENSE`).
-- [ ] No keys in the repo: `web/.env.local` is gitignored. Rotate the Deepgram key after the weekend.
+- [ ] No keys in the repo: `web/.env.local` is gitignored. Rotate the OpenAI key after the weekend.
 - [ ] DeepStation: project name, this blurb, GitHub link → **Submit Project** by 4:45 PM ET.
 - [ ] Optional: phone video of one full run (YouTube link or MP4 ≤ 500 MB).

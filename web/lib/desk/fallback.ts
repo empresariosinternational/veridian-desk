@@ -4,7 +4,7 @@
  * The on-screen buttons send these exact lines through the same pipeline as
  * the microphone (POST /api/desk/hear), so a loud room cannot kill the demo.
  * Each line also carries a pre-parsed plan: if the rules router ever misreads
- * a line, or Deepgram mishears one, the scripted plan still files it.
+ * a line, or transcription mishears one, the scripted plan still files it.
  */
 
 import { addDays, endOfWorkWeek, lastWeekday, nextWeekday } from "./time";

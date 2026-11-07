@@ -238,6 +238,17 @@
   color: var(--btn-primary-bg);
 }
 .hint { margin: 0; font-size: var(--text-tiny); color: var(--text-tertiary); line-height: var(--lh-normal); }
+.assistant { display: flex; flex-direction: column; gap: var(--sp-2); min-width: 0; }
+.assistant select { flex: 1; width: auto; }
+.assistant textarea { resize: vertical; }
+.conversation { display: flex; flex-direction: column; gap: var(--sp-2); max-height: 360px; overflow-y: auto; }
+.userTurn, .assistantTurn { padding: var(--sp-2); border-radius: var(--r-md); font-size: var(--text-tiny); line-height: var(--lh-normal); }
+.userTurn { background: var(--surface-2); }
+.assistantTurn { border: 1px solid var(--border-faint); }
+.chatText { margin: 4px 0 0; white-space: pre-wrap; }
+.taskList { margin: var(--sp-2) 0 0; padding-left: var(--sp-4); }
+.taskList li + li { margin-top: var(--sp-2); }
+.taskList span { display: block; color: var(--text-secondary); }
 .notice {
   margin: 0;
   font-size: var(--text-tiny);
@@ -317,7 +328,7 @@
 .tagDonor { color: var(--warning); border-color: var(--warning); }
 .tagClinical { color: var(--danger); border-color: var(--danger); }
 .tagOk { color: var(--success); border-color: var(--success); }
-.tagWarn { color: var(--warning); border-color: var(--warning); }
+.tagWarn { color: var(--warning); border-color: var(--warning); white-space: normal; overflow-wrap: anywhere; }
 .tagUrgent { color: var(--btn-primary-bg); border-color: var(--danger); background: var(--danger); }
 .tagLang { color: var(--veridian-bright); border-color: var(--veridian); }
 
