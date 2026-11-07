@@ -5,7 +5,7 @@ Submit on DeepStation by **Sunday, Nov 8, 4:45 PM ET**. Be in the room at **4:30
 
 ## DeepStation blurb
 
-Veridian Desk is a push-to-talk assistant for nonprofits, communities, and the people in them. Staff and neighbors say each fact once. The browser recognizes their speech and speaks the confirmation without a voice key; optional GPT plans the filing actions. The desk files the note, merges a duplicate donor before Give Miami Day, turns a workshop request into an approval checklist, keeps counseling detail out of the funder report, and drafts a grant update from a truth ledger. The same network staffs a shift, recruits a person who already offered to help, and lets a second community accept a public same-day need. A sensor node shows when the desk is listening. GPT powers chat and executive task planning; voice uses the browser.
+Veridian Desk is a push-to-talk assistant for nonprofits, communities, and the people in them. Staff and neighbors say each fact once. The browser recognizes their speech. Deepgram Aura-2 speaks the confirmation; optional GPT plans the filing actions. The desk files the note, merges a duplicate donor before Give Miami Day, turns a workshop request into an approval checklist, keeps counseling detail out of the funder report, and drafts a grant update from a truth ledger. The same network staffs a shift, recruits a person who already offered to help, and lets a second community accept a public same-day need. A sensor node shows when the desk is listening. GPT powers chat and executive task planning; voice uses the browser.
 
 ## Run it
 
@@ -18,10 +18,10 @@ npm run dev                    # open localhost:3000/desk for browser hardware A
 
 Before you go on:
 
-1. The header pill should say **Browser voice · no key needed**. Allow microphone access in a browser with speech recognition. GPT is optional: without its key, voice and desk-rule filing still work.
+1. The header pill should say **Deepgram · Vesta & Selena**. Allow microphone access in a browser with speech recognition. `DEEPGRAM_API_KEY` must be set on the server. GPT is optional: without its key, desk-rule filing still works.
 2. Do one live test so the browser asks for the microphone now, not on stage: **Arm**, hold **Hold to talk**, say “This is Ana. Testing the desk.”, release, and listen for the spoken confirmation.
 3. Press **Reset demo** twice (the second click confirms). The desk is back to the seed.
-4. Laptop volume up. The browser speaks the confirmation using speech synthesis. No speech-provider key is needed.
+4. Laptop volume up. Deepgram speaks the confirmation in Vesta (English) or Selena (Spanish).
 
 Every line below has a button in the left panel. The buttons send the exact text through the same pipeline as the mic (`POST /api/desk/hear`), so a loud room cannot kill the demo. Speak a line live when the room is quiet. Use the button when it is not.
 
@@ -70,12 +70,12 @@ Prove it before you go on: `cd web && npm run desk:smoke` runs this whole script
 
 ## What is real and what is demo
 
-- Real: push-to-talk capture, GPT Responses API chat/planning, browser speech recognition and synthesis, say-it-once keys, the truth-ledger guard, server-side funder redaction, the public-only network check, dual-consent accept, B2C accept/decline, the JSON store, and the node protocol.
+- Real: push-to-talk capture, GPT Responses API chat/planning, browser speech recognition, Deepgram Aura-2 playback, say-it-once keys, the truth-ledger guard, server-side funder redaction, the public-only network check, dual-consent accept, B2C accept/decline, the JSON store, and the node protocol.
 - Demo: all people, organizations, schools, donors and amounts are fictional. Tidepath Family Alliance and Mangrove Mews are made up.
 
 ## Submission checklist
 
 - [ ] Public GitHub repo with an MIT or Apache-2.0 license (see `docs/hackathon/LICENSE`).
-- [ ] No keys are needed for voice. If using GPT, keep the OpenAI key in the server environment; `web/.env.local` is gitignored.
+- [ ] Keep `DEEPGRAM_API_KEY` and, if using GPT, the OpenAI key in the server environment. `web/.env.local` is gitignored.
 - [ ] DeepStation: project name, this blurb, GitHub link → **Submit Project** by 4:45 PM ET.
 - [ ] Optional: phone video of one full run (YouTube link or MP4 ≤ 500 MB).

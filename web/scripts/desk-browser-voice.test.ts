@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
-import { captureSpeech, speakInBrowser, speechRecognition, type VoiceCapture } from "../lib/desk/browser-voice";
+import { captureSpeech, speechRecognition, type VoiceCapture } from "../lib/desk/browser-voice";
 
 class FakeRecognition {
   static current: FakeRecognition;
@@ -71,27 +71,4 @@ test("recognition permission errors return a useful message without transcript s
 test("unsupported browsers get a text fallback", () => {
   assert.equal(speechRecognition(), null);
   assert.throws(() => captureSpeech("en-US", null), /Speech recognition is unavailable/);
-});
-
-test("browser playback selects a matching voice and needs no provider or key", () => {
-  const previousWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
-  const previousUtterance = Object.getOwnPropertyDescriptor(globalThis, "SpeechSynthesisUtterance");
-  const spoken: any[] = [];
-  let canceled = 0;
-  class Utterance { lang = ""; voice = null; onerror = null; constructor(public text: string) {} }
-  const localSpanish = { lang: "es-US", localService: true };
-  const synthesis = { cancel: () => { canceled++; }, getVoices: () => [{ lang: "en-US", localService: true }, localSpanish], speak: (utterance: unknown) => spoken.push(utterance) };
-  Object.defineProperty(globalThis, "window", { configurable: true, value: { speechSynthesis: synthesis, SpeechSynthesisUtterance: Utterance } });
-  Object.defineProperty(globalThis, "SpeechSynthesisUtterance", { configurable: true, value: Utterance });
-  try {
-    let failures = 0;
-    assert.equal(speakInBrowser("Anotado una vez.", "es", () => { failures++; }), true);
-    assert.equal(spoken[0].text, "Anotado una vez."); assert.equal(spoken[0].lang, "es-US");
-    assert.equal(spoken[0].voice, localSpanish); assert.equal(canceled, 1);
-    spoken[0].onerror({ error: "canceled" }); assert.equal(failures, 0);
-    spoken[0].onerror({ error: "synthesis-failed" }); assert.equal(failures, 1);
-  } finally {
-    if (previousWindow) Object.defineProperty(globalThis, "window", previousWindow); else delete (globalThis as any).window;
-    if (previousUtterance) Object.defineProperty(globalThis, "SpeechSynthesisUtterance", previousUtterance); else delete (globalThis as any).SpeechSynthesisUtterance;
-  }
 });

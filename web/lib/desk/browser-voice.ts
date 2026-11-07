@@ -1,4 +1,4 @@
-/** Browser speech APIs. Neither recognition nor playback needs an application API key. */
+/** Browser speech recognition. Spoken replies are Deepgram Aura-2, not speechSynthesis. */
 import type { Lang } from "./types";
 
 type Recognition = {
@@ -85,24 +85,56 @@ export function captureSpeech(language: string, Constructor = speechRecognition(
   return { result, stop, abort };
 }
 
-export function canSpeak(): boolean {
-  return typeof window !== "undefined" && "speechSynthesis" in window && "SpeechSynthesisUtterance" in window;
+let generation = 0;
+let playing: { pause(): void; src: string } | null = null;
+let objectUrl: string | null = null;
+
+export function canPlaySpoken(): boolean {
+  return typeof window !== "undefined" && typeof Audio !== "undefined";
 }
 
 export function cancelSpeech(): void {
-  if (canSpeak()) window.speechSynthesis.cancel();
+  generation += 1;
+  if (typeof window !== "undefined" && "speechSynthesis" in window) window.speechSynthesis.cancel();
+  if (playing) {
+    playing.pause();
+    playing.src = "";
+    playing = null;
+  }
+  if (objectUrl) {
+    URL.revokeObjectURL(objectUrl);
+    objectUrl = null;
+  }
 }
 
-export function speakInBrowser(text: string, lang: Lang, onError: () => void): boolean {
-  if (!canSpeak() || !text) return false;
+/** Ask the server for a Deepgram voice and play that audio. Never starts speechSynthesis. */
+export async function speakWithPersonality(text: string, lang: Lang, onError: () => void): Promise<boolean> {
   cancelSpeech();
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = lang === "es" ? "es-US" : lang === "ht" ? "ht-HT" : "en-US";
-  const voices = window.speechSynthesis.getVoices().filter((voice) => voice.lang.startsWith(lang));
-  utterance.voice = voices.find((voice) => voice.localService) ?? voices[0] ?? null;
-  utterance.onerror = (event) => {
-    if (event.error !== "interrupted" && event.error !== "canceled") onError();
-  };
-  try { window.speechSynthesis.speak(utterance); return true; }
-  catch { return false; }
+  const mine = generation;
+  const spoken = text.trim();
+  if (!spoken || !canPlaySpoken()) {
+    if (spoken) onError();
+    return false;
+  }
+  try {
+    const response = await fetch("/api/desk/speak", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: spoken.slice(0, 1000), lang }),
+    });
+    if (mine !== generation) return false;
+    if (!response.ok) throw new Error("Deepgram voice unavailable");
+    const blob = await response.blob();
+    if (mine !== generation) return false;
+    if (!blob.size) throw new Error("empty audio");
+    objectUrl = URL.createObjectURL(blob);
+    const audio = new Audio(objectUrl);
+    playing = audio;
+    audio.onerror = () => { if (mine === generation) onError(); };
+    await audio.play();
+    return mine === generation;
+  } catch {
+    if (mine === generation) onError();
+    return false;
+  }
 }

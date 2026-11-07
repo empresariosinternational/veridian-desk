@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import VeridianMark from "./VeridianMark";
 import { useVeridian } from "./VeridianContext";
-import { cancelSpeech, captureSpeech, speakInBrowser, speechRecognition, type VoiceCapture } from "@/lib/desk/browser-voice";
+import { cancelSpeech, captureSpeech, speakWithPersonality, speechRecognition, type VoiceCapture } from "@/lib/desk/browser-voice";
 import { applyTaskActions, loadTasks, localDay, saveTasks, sortTasks, taskStorageKey, type Message, type Priority, type Suggestion, type Task, type TaskAction } from "@/lib/veridian/tasks";
 import type { Lang } from "@/lib/desk/types";
 
@@ -134,8 +134,8 @@ export default function VeridianDock() {
       if (result.actions?.length) commit(result.actions);
       setMessages((previous) => [...previous, { role: "assistant", text: result.reply, suggestions: result.suggestions ?? [] }].slice(-24) as Message[]);
       if (source === "voice" && readReplies && epoch === voiceEpoch.current) {
-        const failed = () => setNotice("Browser playback is unavailable. You can read the reply above.");
-        if (!speakInBrowser(result.reply, result.lang ?? "en", failed)) failed();
+        const failed = () => setNotice("Spoken reply is unavailable. You can read the reply above.");
+        void speakWithPersonality(result.reply, result.lang ?? "en", failed);
       }
     } catch (error) {
       if (!mounted.current) return;
