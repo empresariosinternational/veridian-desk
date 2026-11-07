@@ -62,7 +62,7 @@ export default function ArduinoNode({ status, urgent, line, onTrigger, onRelease
       if (!mounted.current) { await next.close(); return; }
       connectionRef.current = next;
       setConnection(next);
-      setNotice("Arduino connected. Arm, then hold your hand 2–20 cm from the sonar while speaking. Move it away to stop and file.");
+      setNotice("Arduino connected. Arm, then hold your hand 2–20 cm from the sonar while speaking. Move it at least 30 cm away for one second to stop and file.");
     } catch (error) {
       if (mounted.current) setNotice(error instanceof Error ? error.message : "Could not connect Arduino. Close the Arduino Serial Monitor and try again.");
     } finally {

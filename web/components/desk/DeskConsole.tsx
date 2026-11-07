@@ -436,7 +436,7 @@ export default function DeskConsole() {
           <ArduinoNode
             status={offline ? "OFFLINE" : working || finishingVoice ? "WORKING" : recording ? "LISTENING" : node.armed ? "ARMED" : node.status}
             urgent={node.urgent}
-            line={offline ? "Desk server unavailable" : working || finishingVoice ? "Working" : recording ? "Listening - speak now" : node.armed ? "Wave near sonar or hold to talk" : node.lineAscii}
+            line={offline ? "Desk server unavailable" : working || finishingVoice ? "Working" : recording ? "Listening - speak now" : node.armed ? "Hold hand near sonar or hold to talk" : node.lineAscii}
             onTrigger={() => { if (!document.hidden && !offline) startTalk("sonar"); }}
             onRelease={() => { if (captureSourceRef.current === "sonar") stopTalkRef.current(); }}
             onDisconnect={() => { if (captureSourceRef.current === "sonar") cancelTalk(); }}
@@ -479,7 +479,7 @@ export default function DeskConsole() {
             </button>
           )}
           <p className={css.hint}>
-            Arm, then hold your hand near the sonar while speaking, or hold to talk. Move your hand away to stop and file. Browser recognition may end sooner; Disarm cancels capture. The browser recognizes speech. Deepgram speaks the confirmation. Only the transcript goes to the desk.
+            Arm, then hold your hand near the sonar while speaking, or hold to talk. Move your hand at least 30 cm away for one second to stop and file. Browser recognition may end sooner; Disarm cancels capture. The browser recognizes speech. Deepgram speaks the confirmation. Only the transcript goes to the desk.
             {!voiceReady.creoleLive && " Creole notes are entered by staff."}
           </p>
 

@@ -90,10 +90,16 @@ test("hand-away serial event stops recognition and waits for the final transcrip
   assert.equal(recognition.stops, 0);
   let finished = false;
   void capture.result.then(() => { finished = true; });
+  // Microphone capture must not hold up the USB heartbeat or release reader.
+  await connection.sendState("LISTENING", false, "Listening");
+  assert.deepEqual(fixture.frames, ["STATE|LISTENING|0|Listening\n"]);
+  assert.equal(finished, false);
   fixture.receive('{"event":"sonar-release"}\n{"event":"sonar-release"}\n');
   await setImmediate();
   assert.equal(recognition.stops, 1);
   assert.equal(finished, false);
+  await connection.sendState("WORKING", false, "Finishing transcript");
+  assert.equal(fixture.frames.length, 2);
   recognition.onresult({ results: [{ 0: { transcript: "Call the school tomorrow." } }] });
   recognition.onend();
   assert.deepEqual(await capture.result, { text: "Call the school tomorrow.", error: null, aborted: false });

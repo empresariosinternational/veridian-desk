@@ -35,7 +35,7 @@ Select **Owen**, send “What needs attention today?” in Chat, then ask a foll
 
 | Time | Do | Say / point at |
 |---|---|---|
-| 0:00 | **Arm.** Status ARMED. Hold to talk, or hold a hand 2–20 cm from the connected Arduino sonar; status changes to LISTENING. Move the hand away to stop and file. | “Nothing listens until a person arms it. Hold to talk or keep your hand near the sensor while speaking, then move it away to file.” |
+| 0:00 | **Arm.** Status ARMED. Hold to talk, or hold a hand 2–20 cm from the connected Arduino sonar; status changes to LISTENING. Move the hand away for one second to stop and file. | “Nothing listens until a person arms it. Hold to talk or keep your hand near the sensor while speaking, then move it away for one second to file.” |
 | 0:15 | **2 · Marisol:** “This is Marisol. Jordan missed mentoring on Tuesday. Call his mom this week.” | Calls board: Jordan's mom, due Friday. Quarterly report follow-ups go 0 → 1. |
 | 0:35 | **3 · Denise:** “This is Denise. Maria Gonzalez is on the donor list twice and has not given since March.” | Two records become one; the shared gift counts once. “Call before Give Miami Day — Thu, Nov 19.” |
 | 0:55 | **4 · Yesenia:** “This is Yesenia. Edison Elementary wants a safety workshop on Thursday in Spanish.” | Card: Edison, Thu Nov 12, Español, `slides-pending`, checklist with an owner per step. |

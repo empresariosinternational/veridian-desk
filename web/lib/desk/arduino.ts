@@ -53,6 +53,8 @@ export async function connectArduino(onTrigger: () => void, onRelease: () => voi
             if (!overflow) {
               try {
                 const event = JSON.parse(buffer);
+                // Do not await microphone startup or transcript finalization here:
+                // release events and host heartbeats must keep flowing.
                 if (!closed && event?.event === "sonar") onTrigger();
                 else if (!closed && event?.event === "sonar-release") onRelease();
               } catch { /* Ignore boot messages or invalid frames. */ }
