@@ -1,0 +1,58 @@
+# .cursorrules — Luma Scene
+
+Project conventions for AI-assisted development (Cursor / agentic). These rules
+encode how this app was built and how to keep it consistent.
+
+## Product north star
+- One job: "where are the people I follow showing up?" Don't add scope that
+  dilutes that. When a feature requires a login, stop and reconsider — it
+  probably doesn't belong here.
+- Elegance over features. The whole point is that it's almost embarrassingly simple.
+
+## The one architectural rule: no database, no auth
+- The URL is the account. A user's state (cities + follows) lives entirely in
+  query params: ?cities=Miami,San+Francisco&follows=usr-X,usr-Y.
+- Never introduce a database, a user table, cookies-as-identity, or a login wall
+  for the core scene. If you think you need persistence, you almost certainly
+  want to encode it in the URL instead.
+- No private data is stored, because there is nowhere to store it. Keep it that way.
+
+## Data: Luma's public API only
+- Use Luma's public JSON endpoints (the same ones their own site calls) — no auth.
+  - api.lu.ma/user/profile/events-hosting?user_api_id=usr-… — a host's upcoming events
+  - luma.com/user/<usr-id|handle> — profile HTML (name + avatar)
+  - api.lu.ma/event/get?event_api_id=… — event detail / featured guests
+- A "follow" entry can arrive as a bare handle, @handle, full profile URL,
+  short lu.ma/u/… URL, or a raw usr-id. The resolver must handle all forms.
+- Never silently drop a follow. If a host can't be resolved or has no events,
+  surface that ("no upcoming events") rather than making them vanish.
+
+## Performance is a feature
+- Every page render fans out to many upstream Luma calls. Two non-negotiables:
+  1. Cache the built digest (unstable_cache, ~30 min) keyed on cities+follows so
+     a refresh is an instant cache hit, not a re-crawl.
+  2. Route ALL outbound Luma fetches through the rate limiter in
+     web/lib/luma-rate-limit.ts — bounded concurrency + adaptive backoff +
+     circuit breaker. Don't call fetch to Luma directly.
+- Be a good citizen to Luma's API. Steady-state spacing should be light, but the
+  adaptive backoff must stay intact so we self-throttle if Luma pushes back.
+
+## Code conventions
+- TypeScript, Next.js App Router, React Server Components. Keep data-fetching and
+  digest logic server-side (web/lib/luma.ts); keep client components thin.
+- Match the existing dark "Miami sunset" aesthetic and the design tokens in
+  web/app/globals.css (--ink, --surface-*, --accent*, --r-*). Reuse
+  tokens; don't hardcode colors or radii.
+- Prefer surgical edits. Don't refactor adjacent code unless the task requires it.
+- Always verify with a real build (npm run build) before deploying.
+
+## Deploying
+- Vercel project luma-scene, root is web/. Deploys are commit-to-main driven.
+- Before pushing, fetch + rebase onto origin/main — this repo has multiple
+  contributors pushing in parallel; never clobber someone else's commits.
+
+## Don't
+- Don't add a login, a database, or server-side user state.
+- Don't bypass the rate limiter.
+- Don't ship dev fixtures, sample-data dumps, or .vscode/ configs in the app.
+- Don't let a single broken host take down the whole scene — fail soft, per-row.
