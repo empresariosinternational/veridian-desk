@@ -1,6 +1,6 @@
 # Veridian Desk — Arduino node
 
-Open [desk_node/desk_node.ino](desk_node/desk_node.ino) in Arduino IDE. The node connects to the laptop over USB, displays desk status, and uses a hand gesture at the sonar to start the web application's microphone. The laptop supplies the microphone and handles browser speech recognition; the Arduino sends only a trigger.
+Open [desk_node/desk_node.ino](desk_node/desk_node.ino) in Arduino IDE. The node connects to the laptop over USB, displays desk status, and uses a hand gesture at the sonar to start the web application's microphone. Moving the hand away stops capture. The laptop supplies the microphone and handles browser speech recognition; the Arduino sends start and release events. Re-upload the updated sketch if the board previously used timed eight-second clips.
 
 ## Wiring
 
@@ -25,7 +25,7 @@ A5 is the hardware **SCL** pin on these boards. An OLED marked SCK must support 
 3. Run the web app: `cd web && npm install && npm run dev`. Open **http://localhost:3000/desk** in desktop **Chrome or Edge**. A hosted app must use HTTPS; plain HTTP over a LAN IP does not provide the required browser APIs.
 4. Click **Connect Arduino** and select the board's USB serial port. The app sends status heartbeats at **115200 baud**; the board may reset when the port opens.
 5. Select the speaker and spoken language. Click **Arm**, then move your hand **2–20 cm** in front of the sonar. Allow microphone access when the browser asks.
-6. Speak. Recognition finishes after **8 seconds**, or earlier if the browser ends recognition. Click **Stop and file** to finish sooner. **Disarm**, loss of browser focus, or USB disconnection discards a pending sonar capture.
+6. Keep your hand near the sonar while speaking. Move it at least **30 cm** away, or out of sensor range, to **stop and file**. Five clear samples debounce the release (about **400 ms**). **Stop and file** also finishes capture. Browser recognition may end sooner and has a 60-second limit. **Disarm**, loss of browser focus, or USB disconnection discards a pending sonar capture.
 
 Move the hand away (at least **30 cm**, or out of sensor range) before another gesture. Each successful filing consumes the armed window: click Arm again for the next note. An unused arm expires after two minutes. Holding a hand near the sensor before arming does not start capture; move it away and make a fresh gesture. Manual **Hold to talk** remains available without hardware.
 
@@ -53,9 +53,10 @@ Arduino → browser:
 ```json
 {"event":"ready"}
 {"event":"sonar"}
+{"event":"sonar-release"}
 ```
 
-The sonar emits a single `sonar` event after **three consecutive near readings**, only when the browser reports `ARMED`. Five clear readings re-enable the gesture, with a 1.5-second minimum interval. Sampling runs every 80 ms with a bounded 25 ms echo timeout.
+The sonar emits a single `sonar` event after **three consecutive near readings**, only when the browser reports `ARMED`. After a triggered gesture, **five consecutive clear readings** (at least 30 cm away or no echo) emit one `sonar-release` event and re-enable the gesture. Release is sent even if the browser has not yet reported `LISTENING`, so moving away during a microphone permission prompt cancels that pending capture. Gestures have a 1.5-second minimum interval. Sampling runs every 80 ms with a bounded 25 ms echo timeout; the 20–30 cm gap provides hysteresis against sensor noise.
 
 Browser → Arduino, on state changes and every second:
 

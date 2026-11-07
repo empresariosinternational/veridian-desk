@@ -22,7 +22,7 @@ export function stateFrame(status: string, urgent: boolean, line: string): strin
   return `STATE|${status}|${urgent ? 1 : 0}|${ascii}\n`;
 }
 
-export async function connectArduino(onTrigger: () => void, onDisconnect: () => void): Promise<ArduinoConnection> {
+export async function connectArduino(onTrigger: () => void, onRelease: () => void, onDisconnect: () => void): Promise<ArduinoConnection> {
   const serial = (navigator as SerialNavigator).serial;
   if (!serial) throw new Error("Connect Arduino using desktop Chrome or Edge on HTTPS or localhost.");
   // Called directly from the Connect button so the browser can show its picker.
@@ -54,6 +54,7 @@ export async function connectArduino(onTrigger: () => void, onDisconnect: () => 
               try {
                 const event = JSON.parse(buffer);
                 if (!closed && event?.event === "sonar") onTrigger();
+                else if (!closed && event?.event === "sonar-release") onRelease();
               } catch { /* Ignore boot messages or invalid frames. */ }
             }
             buffer = "";

@@ -64,7 +64,7 @@ Four automations, both sides:
 - Do not call Luma, and do not route new traffic through `luma-rate-limit.ts`. This demo does not need Luma.
 - Do not scrape.
 - No always-on microphone. No hidden recording. No "listen to the room" mode.
-- Capture is push-to-talk or one Arduino sonar-triggered clip of up to eight seconds, after an explicit arm, with a visible listening state. Follow the node-clip state machine: IDLE → ARMED (consent) → LISTENING → WORKING → FILED → IDLE. Raw audio is not stored. Keep the transcript only as the filed note the staffer just spoke.
+- Capture is push-to-talk or while a hand stays near the Arduino sonar, after an explicit arm, with a visible listening state. Releasing the button or moving the hand away stops capture; browser recognition may end sooner and has a 60-second limit. Follow the node-clip state machine: IDLE → ARMED (consent) → LISTENING → WORKING → FILED → IDLE. Raw audio is not stored. Keep the transcript only as the filed note the staffer just spoke.
 - Data classes: `PUBLIC_COMMUNITY`, `OPERATIONAL`, `DONOR`, `CLINICAL`. The agent-to-agent network may carry only `PUBLIC_COMMUNITY`. It must not contain child names, counseling content, donor amounts, or addresses.
 - Demo data is fictional. Tidepath Family Alliance and Mangrove Mews are made-up.
 - Human approval before any outward send. Matches stay `pending` until the demo clicks Accept.
@@ -167,10 +167,10 @@ Voice in and voice out use the laptop microphone and browser speech APIs, with n
 
 - Firmware: `firmware/desk_node/desk_node.ino` using Adafruit SSD1306 and GFX.
 - Adafruit I²C OLED: SCK/SCL → A5, SDA → A4. Probe addresses 0x3C and 0x3D.
-- HC-SR04 sonar: Trig → pin 7, Echo → pin 6. A fresh hand gesture at 2–20 cm starts browser recognition after Arm. Move away beyond 30 cm before repeating.
+- HC-SR04 sonar: Trig → pin 7, Echo → pin 6. A fresh hand gesture at 2–20 cm starts browser recognition after Arm. Keep the hand near while speaking; move it at least 30 cm away or out of range to stop and file, then make a fresh gesture for another capture.
 - Status LED: pin 5 through a resistor. Armed pulse, listening solid, working blink, filed solid, idle/offline off.
 - On `/desk`, choose Connect Arduino in desktop Chrome or Edge on localhost or HTTPS. The browser sends display state every second and listens for newline-delimited sonar events.
-- Sonar capture stops after eight seconds or when recognition ends. Stop and file finishes sooner; Disarm or USB disconnection cancels a pending capture.
+- Sonar capture stops on the Arduino's `sonar-release` event after five consecutive clear readings (about 400 ms), or when browser recognition ends (60-second limit). Stop and file also finishes capture; Disarm or USB disconnection cancels a pending capture.
 
 Document wiring, upload and protocol in `firmware/README.md`. The on-screen node and manual push-to-talk work without a microcontroller.
 

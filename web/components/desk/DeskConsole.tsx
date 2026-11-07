@@ -61,7 +61,6 @@ export default function DeskConsole() {
   const voiceTurn = useRef(0);
   const holding = useRef(false);
   const captureSourceRef = useRef<"manual" | "sonar" | null>(null);
-  const captureTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const finishingCapture = useRef(false);
   const stopTalkRef = useRef<() => void>(() => undefined);
 
@@ -72,8 +71,6 @@ export default function DeskConsole() {
 
   const cancelTalk = useCallback(() => {
     holding.current = false;
-    if (captureTimer.current) clearTimeout(captureTimer.current);
-    captureTimer.current = null;
     finishingCapture.current = false;
     voiceTurn.current++;
     rec.current?.abort();
@@ -91,7 +88,6 @@ export default function DeskConsole() {
     window.addEventListener("blur", onBlur);
     return () => {
       window.removeEventListener("blur", onBlur);
-      if (captureTimer.current) clearTimeout(captureTimer.current);
       voiceTurn.current++;
       rec.current?.abort();
       rec.current = null;
@@ -213,7 +209,7 @@ export default function DeskConsole() {
     [apply, post, cancelTalk],
   );
 
-  // Both modes require Arm. Sonar captures one clip lasting up to eight seconds.
+  // Both modes require Arm. Sonar captures while the hand stays near the sensor.
   const startTalk = useCallback((source: "manual" | "sonar" = "manual") => {
     if (rec.current || finishingCapture.current || busy || !data) return;
     if (!data.node.armed) return flash("Arm the desk first — consent comes before the mic.");
@@ -225,7 +221,6 @@ export default function DeskConsole() {
       const capture = captureSpeech(voiceLanguage);
       rec.current = capture;
       setRecording(true);
-      if (source === "sonar") captureTimer.current = setTimeout(() => stopTalkRef.current(), 8000);
       void capture.result.then((result) => {
         if (rec.current !== capture) return;
         setRecording(false);
@@ -234,8 +229,6 @@ export default function DeskConsole() {
           holding.current = false;
           captureSourceRef.current = null;
           setCaptureSource(null);
-          if (captureTimer.current) clearTimeout(captureTimer.current);
-          captureTimer.current = null;
           flash(result.error);
         } else if (source === "sonar") stopTalkRef.current();
       });
@@ -249,8 +242,6 @@ export default function DeskConsole() {
 
   const stopTalk = useCallback(async () => {
     holding.current = false;
-    if (captureTimer.current) clearTimeout(captureTimer.current);
-    captureTimer.current = null;
     const cur = rec.current;
     if (!cur || finishingCapture.current) return;
     finishingCapture.current = true;
@@ -446,6 +437,7 @@ export default function DeskConsole() {
             urgent={node.urgent}
             line={offline ? "Desk server unavailable" : working || finishingVoice ? "Working" : recording ? "Listening - speak now" : node.armed ? "Wave near sonar or hold to talk" : node.lineAscii}
             onTrigger={() => { if (!document.hidden && !offline) startTalk("sonar"); }}
+            onRelease={() => { if (captureSourceRef.current === "sonar") stopTalkRef.current(); }}
             onDisconnect={() => { if (captureSourceRef.current === "sonar") cancelTalk(); }}
           />
           <label className={css.hint} htmlFor="desk-voice-language">Spoken language</label>
@@ -486,7 +478,7 @@ export default function DeskConsole() {
             </button>
           )}
           <p className={css.hint}>
-            Arm, then wave near the sonar or hold to talk. Sonar recording ends after 8 seconds or when browser recognition ends; Disarm cancels it. Your browser handles speech recognition and spoken confirmations without an API key. Only the transcript goes to the desk. Your browser may use its own speech service.
+            Arm, then hold your hand near the sonar while speaking, or hold to talk. Move your hand away to stop and file. Browser recognition may end sooner; Disarm cancels capture. Your browser handles speech recognition and spoken confirmations without an API key. Only the transcript goes to the desk. Your browser may use its own speech service.
             {!voiceReady.creoleLive && " Creole notes are entered by staff."}
           </p>
 

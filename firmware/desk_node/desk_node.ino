@@ -2,7 +2,7 @@
  * Veridian Desk — Arduino Uno / classic Nano, USB serial at 115200 baud.
  * SSD1306 I2C OLED: clock (SCK/SCL) -> A5, SDA -> A4.
  * HC-SR04 sonar: Trig -> 7, Echo -> 6. Status LED -> 5 via 220 ohms.
- * The laptop records audio; the Arduino only sends a sonar trigger.
+ * The laptop records audio; the Arduino sends sonar start/release events.
  * See ../README.md for setup and the serial protocol.
  */
 #include <Wire.h>
@@ -23,6 +23,7 @@ bool oledReady = false;
 bool hostConnected = false;
 bool urgent = false;
 bool gestureLatched = false;
+bool gestureTriggered = false;
 uint8_t nearSamples = 0;
 uint8_t farSamples = 0;
 unsigned long lastHost = 0;
@@ -99,6 +100,7 @@ void sampleSonar(unsigned long now) {
       if (hostConnected && strcmp_P(status, PSTR("ARMED")) == 0 &&
           (lastTrigger == 0 || now - lastTrigger >= 1500)) {
         lastTrigger = now;
+        gestureTriggered = true;
         Serial.println(F("{\"event\":\"sonar\"}"));
       }
     }
@@ -107,7 +109,15 @@ void sampleSonar(unsigned long now) {
     // Hysteresis and five clear samples prevent chatter at the boundary.
     if (distanceCm == 0 || distanceCm >= RELEASE_CM) {
       if (farSamples < 5) farSamples++;
-      if (farSamples == 5) gestureLatched = false;
+      if (farSamples == 5 && gestureLatched) {
+        gestureLatched = false;
+        // Release must reach the browser even before its LISTENING update
+        // arrives (for example, while microphone permission is pending).
+        if (gestureTriggered) {
+          gestureTriggered = false;
+          if (hostConnected) Serial.println(F("{\"event\":\"sonar-release\"}"));
+        }
+      }
     } else farSamples = 0;
   }
 }

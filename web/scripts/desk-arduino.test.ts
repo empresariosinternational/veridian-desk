@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
 import { setImmediate } from "node:timers/promises";
 import { connectArduino, stateFrame, supportsArduino } from "../lib/desk/arduino";
+import { captureSpeech, type VoiceCapture } from "../lib/desk/browser-voice";
 
 const originalNavigator = Object.getOwnPropertyDescriptor(globalThis, "navigator");
 afterEach(() => {
@@ -47,21 +48,61 @@ test("OLED frames strip delimiters and Unicode, and fit the Uno RX buffer", () =
 
 test("serial input accepts split and combined sonar frames, ignoring invalid/oversize input", async () => {
   const fixture = serialFixture();
-  let triggers = 0;
-  const connection = await connectArduino(() => triggers++, () => undefined);
+  const events: string[] = [];
+  const connection = await connectArduino(() => events.push("start"), () => events.push("release"), () => undefined);
   fixture.receive('boot\n{"event":"ready"}\nnull\n{"event":"so');
-  fixture.receive('nar"}\r\n{"event":"sonar"}\n');
+  fixture.receive('nar"}\r\n{"event":"sonar-release"}\n{"event":"sonar"}\n');
   fixture.receive("x".repeat(300) + '{"event":"sonar"}\n');
+  fixture.receive('{"event":"sonar"}\n{"event":"sonar-rel');
+  fixture.receive('ease"}\r\n');
+  await setImmediate();
+  assert.deepEqual(events, ["start", "release", "start", "start", "release"]);
+  await connection.close();
+});
+
+test("hand-away serial event stops recognition and waits for the final transcript", async (t) => {
+  class Recognition {
+    static current: Recognition;
+    lang = "";
+    continuous = false;
+    interimResults = false;
+    onstart = null;
+    onresult = null;
+    onerror = null;
+    onend = null;
+    stops = 0;
+    constructor() { Recognition.current = this; }
+    start() { this.onstart?.(); }
+    stop() { this.stops++; }
+    abort() {}
+  }
+  const fixture = serialFixture();
+  let capture: VoiceCapture;
+  const connection = await connectArduino(
+    () => { capture = captureSpeech("en-US", Recognition); },
+    () => capture?.stop(),
+    () => capture?.abort(),
+  );
+  t.after(async () => { capture?.abort(); await connection.close(); });
   fixture.receive('{"event":"sonar"}\n');
   await setImmediate();
-  assert.equal(triggers, 3);
-  await connection.close();
+  const recognition = Recognition.current;
+  assert.equal(recognition.stops, 0);
+  let finished = false;
+  void capture.result.then(() => { finished = true; });
+  fixture.receive('{"event":"sonar-release"}\n{"event":"sonar-release"}\n');
+  await setImmediate();
+  assert.equal(recognition.stops, 1);
+  assert.equal(finished, false);
+  recognition.onresult({ results: [{ 0: { transcript: "Call the school tomorrow." } }] });
+  recognition.onend();
+  assert.deepEqual(await capture.result, { text: "Call the school tomorrow.", error: null, aborted: false });
 });
 
 test("writes stay ordered and close cancels pending reads and releases both locks once", async () => {
   const fixture = serialFixture();
   let disconnected = 0;
-  const connection = await connectArduino(() => undefined, () => disconnected++);
+  const connection = await connectArduino(() => undefined, () => undefined, () => disconnected++);
   await Promise.all([
     connection.sendState("ARMED", false, "Wave"),
     connection.sendState("LISTENING", false, "Speak"),
@@ -77,7 +118,7 @@ test("writes stay ordered and close cancels pending reads and releases both lock
 test("unplugging closes the port and notifies the app", async () => {
   const fixture = serialFixture();
   let disconnected = 0;
-  const connection = await connectArduino(() => undefined, () => disconnected++);
+  const connection = await connectArduino(() => undefined, () => undefined, () => disconnected++);
   fixture.unplug();
   await setImmediate();
   await connection.close();
@@ -88,7 +129,7 @@ test("unplugging closes the port and notifies the app", async () => {
 test("a failed USB write tears down the connection without unhandled rejection", async () => {
   const fixture = serialFixture(true);
   let disconnected = 0;
-  const connection = await connectArduino(() => undefined, () => disconnected++);
+  const connection = await connectArduino(() => undefined, () => undefined, () => disconnected++);
   await connection.sendState("ARMED", false, "Wave");
   await connection.close();
   assert.equal(fixture.closed(), 1);
@@ -98,5 +139,5 @@ test("a failed USB write tears down the connection without unhandled rejection",
 test("missing browser serial support is detected", async () => {
   Object.defineProperty(globalThis, "navigator", { configurable: true, value: {} });
   assert.equal(supportsArduino(), false);
-  await assert.rejects(connectArduino(() => undefined, () => undefined), /desktop Chrome or Edge/);
+  await assert.rejects(connectArduino(() => undefined, () => undefined, () => undefined), /desktop Chrome or Edge/);
 });
