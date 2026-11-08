@@ -28,9 +28,9 @@ type HearResponse = Partial<DeskPayload> & {
 type Last = { transcript: string; outcome: HearOutcome | null; voice: Voice | null; notice: string | null; at: number };
 
 const GROUPS: { label: string; ids: ProfileId[] }[] = [
-  { label: "Tidepath · B2B", ids: ["marisol", "denise", "yesenia", "reginald", "owen", "claudette"] },
-  { label: "Mangrove Mews · B2B", ids: ["beatriz"] },
-  { label: "People · B2C", ids: ["ana", "luis"] },
+  { label: "Tidepath staff", ids: ["marisol", "denise", "yesenia", "reginald", "owen", "claudette"] },
+  { label: "Partner group", ids: ["beatriz"] },
+  { label: "Volunteers & neighbors", ids: ["ana", "luis"] },
 ];
 
 const ALL_BOARDS = ["calls", "donors", "workshops", "notes", "staffing", "recruiting", "grants", "colony", "network"] as const;
@@ -273,6 +273,30 @@ export default function DeskConsole() {
     [active, apply, flash, post, showCards],
   );
 
+  const hearRef = useRef(hear);
+  useEffect(() => { hearRef.current = hear; }, [hear]);
+  const deskReady = data !== null;
+  useEffect(() => {
+    if (!deskReady) return;
+    const BOARD_FOR: Record<string, string> = { marisol: "calls", denise: "donors", yesenia: "workshops", reginald: "notes", owen: "staffing", claudette: "grants", beatriz: "colony", "luis-es": "person" };
+    const onRun = (e: Event) => {
+      const id = (e as CustomEvent<{ id: string }>).detail?.id;
+      const line = SCRIPT.find((l) => l.id === id);
+      if (!line) return;
+      primeSpokenAudio();
+      void hearRef.current({ text: line.text, source: "script" }).then(() => {
+        window.setTimeout(() => {
+          const board = BOARD_FOR[line.id];
+          const el = board ? document.querySelector(`[data-board="${board}"]`) : null;
+          el?.scrollIntoView({ behavior: "smooth", block: window.innerWidth <= 720 ? "start" : "center" });
+        }, 400);
+      });
+    };
+    window.addEventListener("veridian:tour-run", onRun);
+    window.dispatchEvent(new Event("veridian:desk-ready"));
+    return () => window.removeEventListener("veridian:tour-run", onRun);
+  }, [deskReady]);
+
   const nodeEvent = useCallback(
     async (event: "arm" | "disarm" | "presence") => {
       if (event === "disarm") cancelTalk();
@@ -285,7 +309,7 @@ export default function DeskConsole() {
   // Both modes require Arm. Sonar captures while the hand stays near the sensor.
   const startTalk = useCallback((source: "manual" | "sonar" = "manual") => {
     if (rec.current || finishingCapture.current || busy || !data) return;
-    if (!data.node.armed) return flash("Arm the desk first — consent comes before the mic.");
+    if (!data.node.armed) return flash("Tap Start listening first. The mic is never on without it.");
     primeSpokenAudio();
     holding.current = true;
     captureSourceRef.current = source;
@@ -443,18 +467,30 @@ export default function DeskConsole() {
           <VeridianMark size={30} />
           <div>
             <h1 className={css.title}>Veridian Desk</h1>
-            <p className={css.subtitle}>Say it once. The desk files it, routes the urgent thing, and keeps private things private.</p>
+            <p className={css.subtitle}>Say it once. The desk files it, tells the right person today, and keeps private things private.</p>
           </div>
         </div>
         <span className={`${css.pill} ${voiceReady.configured ? css.pillOk : css.pillWarn}`}>
-          {voiceReady.configured ? `Deepgram · ${voiceReady.voices.en.name} & ${voiceReady.voices.es.name}` : "Deepgram voice unavailable"}
+          {voiceReady.configured ? "Talks back in English & Spanish" : "Spoken replies off · text still works"}
         </span>
-        {!browserVoice.recognition && <span className={`${css.pill} ${css.pillWarn}`}>Microphone unavailable — type a note</span>}
-        <span className={`${css.pill} ${css.pillOk}`}>{data.assistantReady.key ? "OpenAI GPT · ready" : "Desk rules · ready"}</span>
+        {!browserVoice.recognition && <span className={`${css.pill} ${css.pillWarn}`}>No mic in this browser · type instead</span>}
+        <span className={`${css.pill} ${css.pillOk}`}>{data.assistantReady.key ? "AI ready" : "Works without AI too"}</span>
         <span className={`${css.pill} ${css.pillVeridian}`}>{giveMiamiDay.label}</span>
-        {!data.persistence && <span className={`${css.pill} ${css.pillWarn}`}>running from memory</span>}
+        {!data.persistence && <span className={`${css.pill} ${css.pillWarn}`}>demo mode</span>}
         {offline && <span className={`${css.pill} ${css.pillWarn}`}>reconnecting…</span>}
       </header>
+      <ol style={{ display: "flex", flexWrap: "wrap", gap: 10, listStyle: "none", padding: 0, margin: "4px 0 14px" }} aria-label="How to use the desk">
+        {[
+          ["1", "Pick who you are", "tap a name below"],
+          ["2", "Say or type one thing", "“We need a driver today”"],
+          ["3", "Watch it get filed", "the right boards light up"],
+        ].map(([n, t, d]) => (
+          <li key={n} style={{ flex: "1 1 200px", display: "flex", gap: 10, alignItems: "center", padding: "10px 14px", borderRadius: 14, background: "rgba(99,53,190,0.08)" }}>
+            <span style={{ width: 26, height: 26, flexShrink: 0, borderRadius: 999, background: "#6335BE", color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 13 }}>{n}</span>
+            <span style={{ display: "flex", flexDirection: "column", lineHeight: 1.3 }}><strong style={{ fontSize: 14 }}>{t}</strong><span style={{ fontSize: 13, opacity: 0.75 }}>{d}</span></span>
+          </li>
+        ))}
+      </ol>
 
       <nav className={css.chips} aria-label="whose desk is in front">
         {GROUPS.map((g) => (
@@ -481,9 +517,9 @@ export default function DeskConsole() {
         <aside className={`${css.panel} ${css.sticky}`} aria-label="desk node">
           <DeskAssistant key={assistantEpoch} active={active} profiles={state.profiles} busy={busy === "hear" || voiceBusy} onSend={hear} />
           <div className={css.row}>
-            <span className={css.label}>Desk node</span>
+            <span className={css.label}>Front-desk device</span>
             <span className={css.hint} style={{ marginLeft: "auto" }}>
-              Arduino · sonar + OLED
+              wave a hand to talk
             </span>
           </div>
           <div className={css.device}>
@@ -501,10 +537,10 @@ export default function DeskConsole() {
           {node.presence && <div className={css.presence}>Someone is at the desk.</div>}
           <div className={css.row}>
             <button type="button" className={`${css.btn} ${css.btnArm}`} onClick={() => { primeSpokenAudio(); void nodeEvent("arm"); }} disabled={working || voiceBusy}>
-              Arm
+              Start listening
             </button>
             <button type="button" className={css.btn} onClick={() => nodeEvent("disarm")}>
-              Disarm
+              Stop
             </button>
           </div>
           <ArduinoNode
@@ -549,18 +585,18 @@ export default function DeskConsole() {
                 }
               }}
             >
-              {recording ? "● Listening — release to file" : finishingVoice ? "Finishing transcript…" : node.armed ? "Hold to talk" : "Arm first, then hold to talk"}
+              {recording ? "● Listening — release to file" : finishingVoice ? "Finishing transcript…" : node.armed ? "Hold to talk" : "Tap Start listening, then hold here"}
             </button>
           )}
           <p className={css.hint}>
-            Arm, then keep your hand within 10 cm of the sonar while speaking, or hold to talk. Move beyond 10 cm to stop and file immediately. Browser recognition may end sooner; Disarm cancels capture. The browser recognizes speech. Deepgram speaks the confirmation. Only the transcript goes to the desk.
+            Tap Start listening, then hold the button (or hold your hand over the desk device) and say one thing. Let go and it gets filed, and the desk answers out loud. Only the words are sent, never the audio.
             {!voiceReady.creoleLive && " Creole notes are entered by staff."}
           </p>
 
           {last && (
             <div className={css.last} aria-live="polite">
               <div className={css.row}>
-                <span className={css.label}>Heard · {fmtTime(new Date(last.at).toISOString())}</span>
+                <span className={css.label}>You said · {fmtTime(new Date(last.at).toISOString())}</span>
                 {last.outcome && <span className={`${css.tag} ${css.tagLang}`}>{last.outcome.lang === "es" ? "Español" : "English"}</span>}
                 {last.outcome?.alreadyFiled && <span className={`${css.tag} ${css.tagOk}`}>Already filed</span>}
               </div>
@@ -632,7 +668,7 @@ export default function DeskConsole() {
                 {profile.role}
                 {profile.orgId ? ` · ${state.orgs[profile.orgId].name}` : " · personal desk"}
               </span>
-              <span className={css.tag}>{profile.side}</span>
+              <span className={css.tag}>{profile.side === "B2C" ? "Personal" : "Organization"}</span>
             </div>
             {frontBoards.map((b) => (
               <Board key={b} id={b} ctx={ctx} front personId={b === "person" ? active : undefined} />

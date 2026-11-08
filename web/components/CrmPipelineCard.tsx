@@ -72,7 +72,7 @@ export default function CrmPipelineCard({ sceneQs = "", convergingHosts = [] }: 
 
       {total === 0 && (
         <p className="cal-sub" style={{ marginTop: 10 }}>
-          empty — open CRM and import from your scene.
+          Nobody here yet. Open People to add someone.
         </p>
       )}
     </section>

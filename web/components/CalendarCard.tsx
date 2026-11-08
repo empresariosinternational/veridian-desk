@@ -145,7 +145,7 @@ export default function CalendarCard({ sceneQs = "" }: Props) {
       </ul>
 
       <a className="cal-foot-link" href={crmHref}>
-        open CRM →
+        open People →
       </a>
     </section>
   );

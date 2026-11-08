@@ -72,9 +72,9 @@ export default function YourVeridian() {
     <section className="os-setup" aria-labelledby="os-setup-title">
       <div className="os-setup-hero">
         <div>
-          <div className="eyebrow">setup · your veridian</div>
-          <h1 id="os-setup-title">Your Veridian</h1>
-          <p className="sub">What you're working toward, what Veridian should know, and how far it can go on its own. It uses this everywhere: Today, The Pond, people, events and the desk.</p>
+          <div className="eyebrow">Settings</div>
+          <h1 id="os-setup-title">Teach your assistant</h1>
+          <p className="sub">Tell Veridian what matters most, what it should know, and how much it can do without asking. It uses this on every page.</p>
         </div>
         <p className="os-setup-voice"><VeridianMark size={18} />Changes save in this browser as you make them.</p>
       </div>
@@ -84,7 +84,7 @@ export default function YourVeridian() {
       <div className="os-setup-grid">
         <section id="goals" className="os-panel" aria-labelledby="s-goals">
           <h2 id="s-goals">Goals, in order</h2>
-          <p className="sub">The first goal leads Today and the first ripples on The Pond.</p>
+          <p className="sub">Your top goal decides what shows up first on Home and Partners.</p>
           <ol className="os-goal-list">
             {on.map((g, i) => (
               <li key={g}>
@@ -107,7 +107,7 @@ export default function YourVeridian() {
 
         <section id="autonomy" className="os-panel" aria-labelledby="s-auto">
           <h2 id="s-auto">How far Veridian goes on its own</h2>
-          <p className="sub">Whatever you pick, anything that leaves your team waits for your approval, and Pond intros need both sides to say yes.</p>
+          <p className="sub">Whatever you pick, anything that leaves your team waits for your approval, and partner intros need both sides to say yes.</p>
           <div className="os-autonomy" role="radiogroup" aria-labelledby="s-auto">
             {AUTONOMY.map((a) => (
               <label key={a.id} className={`os-radio${prefs.autonomy === a.id ? " is-on is-violet" : ""}`}>
@@ -120,11 +120,11 @@ export default function YourVeridian() {
 
         <section className="os-panel" aria-labelledby="s-know">
           <h2 id="s-know">What Veridian knows</h2>
-          <p className="sub">Context it may draw on. Figures come only from your truth ledger.</p>
+          <p className="sub">Context it may draw on. Figures come only from your facts log.</p>
           <ul className="os-source-list">
-            <li><strong>Your Pond profile</strong><span>{listing ? `${listing.name} · ${listing.offers.length} offers, ${listing.needs.length} needs` : "Not listed yet. "}{!listing && <Link href="/social-scene/join" prefetch={false}>Join The Pond</Link>}</span></li>
+            <li><strong>Your partner listing</strong><span>{listing ? `${listing.name} · ${listing.offers.length} offers, ${listing.needs.length} needs` : "Not listed yet. "}{!listing && <Link href="/social-scene/join" prefetch={false}>Join The Pond</Link>}</span></li>
             <li><strong>Voice guide</strong><span>{guide.rules.length} rules and {guide.samples.length} sample lines</span></li>
-            <li><strong>Truth ledger</strong><span>{ledgerCount} figures Veridian may quote, nothing else</span></li>
+            <li><strong>Facts log</strong><span>{ledgerCount} figures Veridian may quote, nothing else</span></li>
             <li><strong>Calendar and events</strong><span>What's coming up in your scene</span></li>
             {prefs.links.map((l) => (
               <li key={l}>
@@ -167,7 +167,7 @@ export default function YourVeridian() {
 
         <section className="os-panel" aria-labelledby="s-leave">
           <h2 id="s-leave">What leaves your desk</h2>
-          <p className="sub">The desk checks anything it puts on The Pond against this list. Drafts never send on their own.</p>
+          <p className="sub">The desk checks anything it shares with partners against this list. Drafts never send on their own.</p>
           <ul className="os-class-list">
             {CLASSES.map((k) => (
               <li key={k.label}>

@@ -44,7 +44,7 @@ export default function DeskAssistant({ active, profiles, busy, onSend }: {
 
   return (
     <section className={css.assistant} aria-label="GPT chat and executive tasks">
-      <span className={css.label}>Chat &amp; executive tasks · {profiles[active].name}</span>
+      <span className={css.label}>Ask or plan · {profiles[active].name}</span>
       <div className={css.row}>
         <select className={css.input} aria-label="Assistant mode" value={mode} disabled={busy} onChange={(e) => setMode(e.target.value as AssistantMode)}>
           <option value="chat">Chat</option>

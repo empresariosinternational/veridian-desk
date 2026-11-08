@@ -2487,7 +2487,8 @@ a.ss-card:hover {
 }
 .os-sidebar .profile-tab-chevron:hover,
 .os-sidebar .profile-tab-chevron[aria-expanded="true"] { background: var(--veridian-bright); }
-.os-sidebar .profile-tab-chevron:focus-visible { outline-color: #fff; }
+/* Aubergine ring: 14:1 on the canvas, so keyboard focus stays visible on lavender. */
+.os-sidebar .profile-tab-chevron:focus-visible { outline-color: var(--text-primary); }
 .os-sidebar .profile-tab-chevron-icon { width: 22px; height: 22px; }
 .os-sidebar .profile-dropdown {
   top: auto;
@@ -2668,7 +2669,7 @@ a.ss-card:hover {
 .os-dock-mic.is-listening { background: var(--danger); box-shadow: 0 0 0 6px rgba(193, 51, 47, 0.22); }
 .os-dock-mic:disabled { opacity: .45; cursor: default; }
 .os-dock-notice { margin: 0; padding: 8px 14px; border-radius: var(--r-pill); background: var(--surface-solid); border: 1px solid var(--border-strong); font-size: 13px; color: var(--text-secondary); }
-@media (max-width: 1023px) { .os-dock { bottom: 76px; padding: 10px 12px 8px; } }
+@media (max-width: 1023px) { .os-dock { bottom: 76px; padding: 10px 12px 8px; } .os-dock { display: none; } }
 
 /* The Pond */
 .os-pond { container-type: inline-size; display: flex; flex-direction: column; gap: 32px; padding-top: 16px; }
@@ -2837,3 +2838,24 @@ a.ss-card:hover {
   .os-focus-main { padding: 16px 14px 40px; }
   .os-event-feature { flex-direction: column; }
 }
+
+/* home: one clear screen (judge-first) */
+.vh-hero { padding: 20px 0 8px; max-width: 760px; }
+.vh-kicker { font-size: 13px; letter-spacing: .02em; color: #6335BE; font-weight: 600; margin-bottom: 10px; }
+.vh-hero h1 { font-size: clamp(26px, 6.4vw, 40px); line-height: 1.12; margin: 0 0 12px; color: var(--ink); letter-spacing: -0.01em; }
+.vh-hero p { font-size: 16px; line-height: 1.5; color: var(--ink-soft); margin: 0 0 18px; }
+.vh-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.vh-primary, .vh-secondary { display: inline-flex; align-items: center; justify-content: center; min-height: 48px; padding: 0 20px; border-radius: 999px; font-weight: 600; font-size: 16px; text-decoration: none; }
+.vh-primary { background: var(--btn-primary-bg); color: var(--btn-primary-fg); }
+.vh-primary:hover { background: var(--btn-primary-hover); }
+.vh-secondary { border: 1.5px solid #6335BE; color: #6335BE; background: transparent; }
+.vh-title { font-size: 18px; margin: 28px 0 12px; color: var(--ink); }
+.vh-grid { display: grid; grid-template-columns: 1fr; gap: 10px; }
+@media (min-width: 720px) { .vh-grid { grid-template-columns: repeat(3, 1fr); } }
+.vh-card { display: block; padding: 14px 16px; border-radius: 14px; background: rgba(99,53,190,0.08); text-decoration: none; color: var(--ink); border: 1px solid transparent; transition: border-color .15s, transform .15s; }
+.vh-card:hover, .vh-card:focus-visible { border-color: #6335BE; transform: translateY(-1px); }
+.vh-who { display: flex; gap: 8px; align-items: baseline; margin-bottom: 6px; }
+.vh-who strong { font-size: 16px; }
+.vh-who span { font-size: 13px; color: var(--ink-mute); }
+.vh-says { font-size: 15px; line-height: 1.4; margin-bottom: 6px; }
+.vh-gets { font-size: 14px; line-height: 1.4; color: var(--ink-soft); }

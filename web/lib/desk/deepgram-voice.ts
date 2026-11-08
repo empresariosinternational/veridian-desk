@@ -3,10 +3,13 @@
  * The model is chosen for a human personality. Aura-1 and local browser voices
  * stay out of this path because they read as flat and robotic.
  *
- * English: Vesta — Natural, Expressive, Patient, Empathetic.
+ * English: Thalia — Clear, Confident, Energetic, Enthusiastic (Deepgram's
+ * casual-chat voice). Vesta, the earlier pick, is a "patient" voice: measured
+ * on the live endpoint it spoke ~150 words a minute with long pauses, which read
+ * as stretched. Thalia measured ~175 words a minute with the fewest pauses.
  * Spanish: Selena — Latin American, Approachable, Friendly, Calm, Positive,
  * and able to move between Spanish and English without a second voice.
- * Aura has no Haitian Creole voice, so Creole confirmations use Vesta.
+ * Aura has no Haitian Creole voice, so Creole confirmations use Thalia.
  */
 import type { Lang } from "./types";
 
@@ -22,6 +25,9 @@ const HUMAN_TRAITS = new Set([
   "comfortable",
   "positive",
   "patient",
+  "energetic",
+  "enthusiastic",
+  "confident",
 ]);
 
 export type SpokenVoice = {
@@ -36,12 +42,12 @@ export type SpokenVoice = {
 
 const ENGLISH: SpokenVoice = {
   provider: "deepgram",
-  model: "aura-2-vesta-en",
-  name: "Vesta",
+  model: "aura-2-thalia-en",
+  name: "Thalia",
   lang: "en",
   accent: "American",
-  personality: ["Natural", "Expressive", "Patient", "Empathetic"],
-  why: "A patient, expressive person at the desk, not an announcer.",
+  personality: ["Clear", "Confident", "Energetic", "Enthusiastic"],
+  why: "A clear, lively person at the desk who talks at a natural conversational pace.",
 };
 
 const SPANISH: SpokenVoice = {
@@ -79,10 +85,12 @@ export function voiceFor(lang: Lang): SpokenVoice {
 export const SPEAK_SAMPLE_RATE = 24_000;
 
 /**
- * Aura's default pace draws vowels out. 1.15 is one step quicker and keeps
- * the voice's contour. Deepgram only accepts steps of 0.05.
+ * Measured on the live endpoint: Thalia at 1.0 speaks ~175 words a minute,
+ * so English sends no speed at all and no time-scaling is applied. Selena keeps
+ * 1.15, where Spanish replies land at ~170 words a minute. Deepgram accepts
+ * 0.7-1.5 in 0.05 steps.
  */
-export const SPEAK_SPEED = 1.15;
+export const SPEAK_SPEED: Readonly<Record<"en" | "es", number>> = { en: 1, es: 1.15 };
 
 export class SpeakFailure extends Error {
   constructor(readonly status: 502 | 504, message: string) {
@@ -92,18 +100,47 @@ export class SpeakFailure extends Error {
 
 export function speakStreamUrl(lang: Lang): string {
   const voice = voiceFor(lang);
+  const speed = SPEAK_SPEED[voice.lang];
   const url = new URL("wss://api.deepgram.com/v1/speak");
   url.searchParams.set("model", voice.model);
   url.searchParams.set("encoding", "linear16");
   url.searchParams.set("sample_rate", String(SPEAK_SAMPLE_RATE));
-  url.searchParams.set("speed", String(SPEAK_SPEED));
+  if (speed !== 1) url.searchParams.set("speed", String(speed));
   return url.toString();
+}
+
+/**
+ * Aura-2 takes its pacing from the text: every line break, bullet, symbol and
+ * ellipsis becomes a pause. Chat replies arrive as markdown, so speak them as
+ * plain sentences.
+ */
+export function speechText(text: string): string {
+  return text
+    .replace(/```[\s\S]*?```/g, " ")
+    .replace(/`([^`]*)`/g, "$1")
+    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/https?:\/\/\S+/g, " ")
+    .replace(/\*\*|__/g, "")
+    .replace(/(^|[\s(])\*(?=\S)([^*\n]*?\S)\*(?=[\s).,!?;:]|$)/g, "$1$2")
+    .replace(/^[ \t]{0,3}#{1,6}[ \t]+/gm, "")
+    .replace(/^[ \t]*(?:[-*\u2022\u2013]|\d{1,2}[.)])[ \t]+/gm, "")
+    .replace(/[ \t]*[\u00b7\u2022|][ \t]*/g, ", ")
+    .replace(/[ \t]*(?:\u2192|->|\u21d2)[ \t]*/g, " to ")
+    .replace(/[ \t]+[\u2014\u2013][ \t]+|\u2014/g, ", ")
+    .replace(/\p{Extended_Pictographic}\uFE0F?/gu, "")
+    .replace(/\u2026|\.{2,}/g, ".")
+    .replace(/([^\s.!?,;:])[ \t]*\n+\s*/g, "$1. ")
+    .replace(/\s*\n+\s*/g, " ")
+    .replace(/[ \t]+([,.!?;:])/g, "$1")
+    .replace(/([,;:])(?:[ \t]*[,;:])+/g, "$1")
+    .replace(/[ \t]{2,}/g, " ")
+    .trim();
 }
 
 /** One Speak and one Flush. Splitting the line makes Aura lengthen each ending. */
 export function speakMessages(text: string): string[] {
   return [
-    JSON.stringify({ type: "Speak", text: text.trim() }),
+    JSON.stringify({ type: "Speak", text: speechText(text) }),
     JSON.stringify({ type: "Flush" }),
   ];
 }
