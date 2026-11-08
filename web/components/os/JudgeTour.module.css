@@ -13,7 +13,7 @@
 .panel {
   position: fixed; right: 20px; top: 18px; z-index: 60;
   width: 380px; max-height: calc(100vh - 140px); overflow: auto;
-  background: #fff; color: var(--ink, #1f1530);
+  background: var(--surface-solid, #fff); color: var(--ink, #1f1530);
   border: 1px solid rgba(124, 77, 216, 0.28); border-radius: 18px;
   padding: 18px 20px 16px; box-shadow: 0 18px 48px rgba(40, 20, 80, 0.22);
 }

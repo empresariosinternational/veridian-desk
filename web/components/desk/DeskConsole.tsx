@@ -55,7 +55,7 @@ function saveLocal(state: unknown): void {
   }
 }
 
-export default function DeskConsole() {
+export default function DeskConsole({ stage = false }: { stage?: boolean } = {}) {
   const [data, setData] = useState<DeskPayload | null>(null);
   const [offline, setOffline] = useState(false);
   const [active, setActive] = useState<ProfileId>("marisol");
@@ -278,9 +278,23 @@ export default function DeskConsole() {
   const deskReady = data !== null;
   useEffect(() => {
     if (!deskReady) return;
-    const BOARD_FOR: Record<string, string> = { marisol: "calls", denise: "donors", yesenia: "workshops", reginald: "notes", owen: "staffing", claudette: "grants", beatriz: "colony", "luis-es": "person" };
     const onRun = (e: Event) => {
       const id = (e as CustomEvent<{ id: string }>).detail?.id;
+      if (id) runLineRef.current(id);
+    };
+    const onSay = (e: Event) => {
+      const d = (e as CustomEvent<{ text: string; source: "voice" | "typed"; lang: "en" | "es" }>).detail;
+      if (d?.text) void hearRef.current({ text: d.text, source: d.source === "voice" ? "voice" : "typed", lang: d.lang });
+    };
+    window.addEventListener("veridian:tour-run", onRun);
+    window.addEventListener("veridian:desk-say", onSay);
+    window.dispatchEvent(new Event("veridian:desk-ready"));
+    return () => { window.removeEventListener("veridian:tour-run", onRun); window.removeEventListener("veridian:desk-say", onSay); };
+  }, [deskReady]);
+  const runLineRef = useRef<(id: string) => void>(() => {});
+  const runLine = useCallback((id: string) => {
+    const BOARD_FOR: Record<string, string> = { marisol: "calls", denise: "donors", yesenia: "workshops", reginald: "notes", owen: "staffing", claudette: "grants", beatriz: "colony", "luis-es": "person" };
+    {
       const line = SCRIPT.find((l) => l.id === id);
       if (!line) return;
       primeSpokenAudio();
@@ -291,11 +305,9 @@ export default function DeskConsole() {
           el?.scrollIntoView({ behavior: "smooth", block: window.innerWidth <= 720 ? "start" : "center" });
         }, 400);
       });
-    };
-    window.addEventListener("veridian:tour-run", onRun);
-    window.dispatchEvent(new Event("veridian:desk-ready"));
-    return () => window.removeEventListener("veridian:tour-run", onRun);
-  }, [deskReady]);
+    }
+  }, []);
+  useEffect(() => { runLineRef.current = runLine; }, [runLine]);
 
   const nodeEvent = useCallback(
     async (event: "arm" | "disarm" | "presence") => {
@@ -461,7 +473,7 @@ export default function DeskConsole() {
   const ctx: BoardCtx = { data, active, hot, hotBoards, funder, funderOn, setFunderOn, busy, act };
 
   return (
-    <div className={css.console}>
+    <div className={`${css.console} ${stage ? css.stage : ""}`}>
       <header className={css.head}>
         <div className={css.brand}>
           <VeridianMark size={30} />
@@ -470,11 +482,7 @@ export default function DeskConsole() {
             <p className={css.subtitle}>Say it once. The desk files it, tells the right person today, and keeps private things private.</p>
           </div>
         </div>
-        <span className={`${css.pill} ${voiceReady.configured ? css.pillOk : css.pillWarn}`}>
-          {voiceReady.configured ? "Talks back in English & Spanish" : "Spoken replies off · text still works"}
-        </span>
         {!browserVoice.recognition && <span className={`${css.pill} ${css.pillWarn}`}>No mic in this browser · type instead</span>}
-        <span className={`${css.pill} ${css.pillOk}`}>{data.assistantReady.key ? "AI ready" : "Works without AI too"}</span>
         <span className={`${css.pill} ${css.pillVeridian}`}>{giveMiamiDay.label}</span>
         {!data.persistence && <span className={`${css.pill} ${css.pillWarn}`}>demo mode</span>}
         {offline && <span className={`${css.pill} ${css.pillWarn}`}>reconnecting…</span>}
@@ -482,11 +490,11 @@ export default function DeskConsole() {
       <ol style={{ display: "flex", flexWrap: "wrap", gap: 10, listStyle: "none", padding: 0, margin: "4px 0 14px" }} aria-label="How to use the desk">
         {[
           ["1", "Pick who you are", "tap a name below"],
-          ["2", "Say or type one thing", "“We need a driver today”"],
-          ["3", "Watch it get filed", "the right boards light up"],
+          ["2", "Tap a line, or hold to talk", stage ? "the row below · English or Spanish" : "left side · English or Spanish"],
+          ["3", "Watch it get filed", stage ? "the big board below lights up" : "the board on the right lights up"],
         ].map(([n, t, d]) => (
-          <li key={n} style={{ flex: "1 1 200px", display: "flex", gap: 10, alignItems: "center", padding: "10px 14px", borderRadius: 14, background: "rgba(99,53,190,0.08)" }}>
-            <span style={{ width: 26, height: 26, flexShrink: 0, borderRadius: 999, background: "#6335BE", color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 13 }}>{n}</span>
+          <li key={n} style={{ flex: "1 1 200px", display: "flex", gap: 10, alignItems: "center", padding: "10px 14px", borderRadius: 14, background: "var(--veridian-soft)" }}>
+            <span style={{ width: 26, height: 26, flexShrink: 0, borderRadius: 999, background: "var(--veridian)", color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 13 }}>{n}</span>
             <span style={{ display: "flex", flexDirection: "column", lineHeight: 1.3 }}><strong style={{ fontSize: 14 }}>{t}</strong><span style={{ fontSize: 13, opacity: 0.75 }}>{d}</span></span>
           </li>
         ))}
@@ -515,26 +523,69 @@ export default function DeskConsole() {
 
       <div className={css.grid}>
         <aside className={`${css.panel} ${css.sticky}`} aria-label="desk node">
-          <DeskAssistant key={assistantEpoch} active={active} profiles={state.profiles} busy={busy === "hear" || voiceBusy} onSend={hear} />
-          <div className={css.row}>
-            <span className={css.label}>Front-desk device</span>
-            <span className={css.hint} style={{ marginLeft: "auto" }}>
-              wave a hand to talk
-            </span>
+          <div className={css.scriptList}>
+            <span className={css.label} style={{ fontSize: 13, color: "var(--veridian-bright)" }}>① Start here · tap a line</span>
+            <p className={css.hint} style={{ margin: "0 0 4px" }}>Each line runs through the same pipeline as the microphone. Watch the right side light up where it got filed.</p>
+            {SCRIPT.map((l, idx) => (
+              <button
+                key={l.id}
+                type="button"
+                className={`${css.scriptBtn} ${done.has(l.id) ? css.scriptDone : ""}`}
+                disabled={busy === "hear" || voiceBusy}
+                onClick={() => runLine(l.id)}
+              >
+                <span className={css.stepNum}>{idx + 1}</span>
+                <span>
+                  <strong>
+                    {l.label}
+                    {l.optional ? " (optional)" : ""}
+                  </strong>
+                  {l.text}
+                </span>
+              </button>
+            ))}
+            <button type="button" className={css.scriptBtn} disabled={busy === "hear" || voiceBusy} onClick={() => hear({ text: SCRIPT[0].text, source: "script" })}>
+              <span className={css.stepNum}>↻</span>
+              <span>
+                <strong>Repeat Marisol</strong>Say it again — the desk should answer “Already filed”.
+              </span>
+            </button>
           </div>
-          <div className={css.device}>
-            <div className={css.lights} aria-hidden="true">
-              <span className={`${css.lamp} ${css.lampRed} ${lampOn("red")} ${node.blink && !working ? css.blink : ""}`} />
-              <span className={`${css.lamp} ${css.lampAmber} ${lampOn("amber")}`} />
-              <span className={`${css.lamp} ${css.lampGreen} ${lampOn("green")}`} />
-              <span className={`${css.lamp} ${css.lampIdle} ${lampOn("white")}`} />
+          {last && (
+            <div className={css.last} aria-live="polite">
+              <div className={css.row}>
+                <span className={css.label}>You said · {fmtTime(new Date(last.at).toISOString())}</span>
+                {last.outcome && <span className={`${css.tag} ${css.tagLang}`}>{last.outcome.lang === "es" ? "Español" : "English"}</span>}
+                {last.outcome?.alreadyFiled && <span className={`${css.tag} ${css.tagOk}`}>Already filed</span>}
+              </div>
+              {last.transcript && <p className={css.quote}>“{last.transcript}”</p>}
+              {last.outcome?.say && <p className={css.say}>{last.outcome.say}</p>}
+              {last.outcome?.cards?.length ? (
+                <div className={css.tags}>
+                  {last.outcome.cards.map((c) => (
+                    <span key={`${c.board}-${c.id}-${c.label}`} className={css.tag}>
+                      {c.label}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
+              <div className={css.row}>
+                {last.voice?.via && <span className={css.hint}>{last.voice.via}</span>}
+                {spokenRef.current && browserVoice.playback && (
+                  <button type="button" className={`${css.btn} ${css.btnGhost} ${css.btnSmall}`} disabled={voiceBusy} onClick={() => {
+                    const spoken = spokenRef.current;
+                    if (spoken) void speakWithPersonality(spoken.text, spoken.lang, () => flash("Spoken reply is unavailable. The confirmation is shown below."));
+                  }}>
+                    ▶ replay
+                  </button>
+                )}
+              </div>
+              {last.notice && <p className={css.notice}>{last.notice}</p>}
             </div>
-            <div className={css.oled} role="status" aria-live="polite">
-              <span className={css.oledStatus}>{working || finishingVoice ? "WORKING" : recording ? "LISTENING" : node.armed ? "ARMED" : node.status}</span>
-              <span className={node.urgent && node.status === "IDLE" ? css.urgentText : ""}>{node.line}</span>
-            </div>
-          </div>
-          {node.presence && <div className={css.presence}>Someone is at the desk.</div>}
+          )}
+
+          <div className={css.scriptList} style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid rgba(99,53,190,0.15)" }}>
+            <span className={css.label} style={{ fontSize: 13, color: "var(--veridian-bright)" }}>② Or say it yourself</span>
           <div className={css.row}>
             <button type="button" className={`${css.btn} ${css.btnArm}`} onClick={() => { primeSpokenAudio(); void nodeEvent("arm"); }} disabled={working || voiceBusy}>
               Start listening
@@ -543,14 +594,6 @@ export default function DeskConsole() {
               Stop
             </button>
           </div>
-          <ArduinoNode
-            status={offline ? "OFFLINE" : working || finishingVoice ? "WORKING" : recording ? "LISTENING" : node.armed ? "ARMED" : node.status}
-            urgent={node.urgent}
-            line={offline ? "Desk server unavailable" : working || finishingVoice ? "Working" : recording ? "Listening - speak now" : node.armed ? "Hand within 10 cm or hold to talk" : node.lineAscii}
-            onTrigger={() => { if (!document.hidden && !offline) startTalk("sonar"); }}
-            onRelease={() => { if (captureSourceRef.current === "sonar") stopTalkRef.current(); }}
-            onDisconnect={() => { if (captureSourceRef.current === "sonar") cancelTalk(); }}
-          />
           <label className={css.hint} htmlFor="desk-voice-language">Spoken language</label>
           <select id="desk-voice-language" className={css.input} value={voiceLanguage} onChange={(e) => setVoiceLanguage(e.target.value)} disabled={voiceBusy || busy === "hear"}>
             <option value="en-US">English</option>
@@ -592,69 +635,43 @@ export default function DeskConsole() {
             Tap Start listening, then hold the button (or hold your hand over the desk device) and say one thing. Let go and it gets filed, and the desk answers out loud. Only the words are sent, never the audio.
             {!voiceReady.creoleLive && " Creole notes are entered by staff."}
           </p>
-
-          {last && (
-            <div className={css.last} aria-live="polite">
-              <div className={css.row}>
-                <span className={css.label}>You said · {fmtTime(new Date(last.at).toISOString())}</span>
-                {last.outcome && <span className={`${css.tag} ${css.tagLang}`}>{last.outcome.lang === "es" ? "Español" : "English"}</span>}
-                {last.outcome?.alreadyFiled && <span className={`${css.tag} ${css.tagOk}`}>Already filed</span>}
-              </div>
-              {last.transcript && <p className={css.quote}>“{last.transcript}”</p>}
-              {last.outcome?.say && <p className={css.say}>{last.outcome.say}</p>}
-              {last.outcome?.cards?.length ? (
-                <div className={css.tags}>
-                  {last.outcome.cards.map((c) => (
-                    <span key={`${c.board}-${c.id}-${c.label}`} className={css.tag}>
-                      {c.label}
-                    </span>
-                  ))}
-                </div>
-              ) : null}
-              <div className={css.row}>
-                {last.voice?.via && <span className={css.hint}>{last.voice.via}</span>}
-                {spokenRef.current && browserVoice.playback && (
-                  <button type="button" className={`${css.btn} ${css.btnGhost} ${css.btnSmall}`} disabled={voiceBusy} onClick={() => {
-                    const spoken = spokenRef.current;
-                    if (spoken) void speakWithPersonality(spoken.text, spoken.lang, () => flash("Spoken reply is unavailable. The confirmation is shown below."));
-                  }}>
-                    ▶ replay
-                  </button>
-                )}
-              </div>
-              {last.notice && <p className={css.notice}>{last.notice}</p>}
-            </div>
-          )}
-
-          <div className={css.scriptList}>
-            <span className={css.label}>Demo lines · same pipeline as the mic</span>
-            {SCRIPT.map((l) => (
-              <button
-                key={l.id}
-                type="button"
-                className={`${css.scriptBtn} ${done.has(l.id) ? css.scriptDone : ""}`}
-                disabled={busy === "hear" || voiceBusy}
-                onClick={() => { primeSpokenAudio(); void hear({ text: l.text, source: "script" }); }}
-              >
-                <span className={css.stepNum}>{l.step}</span>
-                <span>
-                  <strong>
-                    {l.label}
-                    {l.optional ? " (optional)" : ""}
-                  </strong>
-                  {l.text}
-                </span>
-              </button>
-            ))}
-            <button type="button" className={css.scriptBtn} disabled={busy === "hear" || voiceBusy} onClick={() => hear({ text: SCRIPT[0].text, source: "script" })}>
-              <span className={css.stepNum}>↻</span>
-              <span>
-                <strong>Repeat Marisol</strong>Say it again — the desk should answer “Already filed”.
-              </span>
-            </button>
           </div>
+          <details style={{ marginTop: 14, paddingTop: 10, borderTop: "1px solid rgba(99,53,190,0.15)" }}>
+            <summary className={css.label} style={{ cursor: "pointer", fontSize: 13 }}>③ More: ask Veridian, plan your day, front-desk device</summary>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 10 }}>
+          <DeskAssistant key={assistantEpoch} active={active} profiles={state.profiles} busy={busy === "hear" || voiceBusy} onSend={hear} />
           <div className={css.row}>
-            <button type="button" className={`${css.btn} ${css.btnGhost} ${css.btnSmall}`} onClick={reset} disabled={busy === "hear" || voiceBusy}>
+            <span className={css.label}>Front-desk device</span>
+            <span className={css.hint} style={{ marginLeft: "auto" }}>
+              wave a hand to talk
+            </span>
+          </div>
+          <div className={css.device}>
+            <div className={css.lights} aria-hidden="true">
+              <span className={`${css.lamp} ${css.lampRed} ${lampOn("red")} ${node.blink && !working ? css.blink : ""}`} />
+              <span className={`${css.lamp} ${css.lampAmber} ${lampOn("amber")}`} />
+              <span className={`${css.lamp} ${css.lampGreen} ${lampOn("green")}`} />
+              <span className={`${css.lamp} ${css.lampIdle} ${lampOn("white")}`} />
+            </div>
+            <div className={css.oled} role="status" aria-live="polite">
+              <span className={css.oledStatus}>{working || finishingVoice ? "WORKING" : recording ? "LISTENING" : node.armed ? "ARMED" : node.status}</span>
+              <span className={node.urgent && node.status === "IDLE" ? css.urgentText : ""}>{node.line}</span>
+            </div>
+          </div>
+          {node.presence && <div className={css.presence}>Someone is at the desk.</div>}
+          <ArduinoNode
+            status={offline ? "OFFLINE" : working || finishingVoice ? "WORKING" : recording ? "LISTENING" : node.armed ? "ARMED" : node.status}
+            urgent={node.urgent}
+            line={offline ? "Desk server unavailable" : working || finishingVoice ? "Working" : recording ? "Listening - speak now" : node.armed ? "Hand within 10 cm or hold to talk" : node.lineAscii}
+            onTrigger={() => { if (!document.hidden && !offline) startTalk("sonar"); }}
+            onRelease={() => { if (captureSourceRef.current === "sonar") stopTalkRef.current(); }}
+            onDisconnect={() => { if (captureSourceRef.current === "sonar") cancelTalk(); }}
+          />
+            </div>
+          </details>
+          <div className={css.row}>
+            <button type="button" className={`${css.btn} ${css.btnGhost} ${css.btnSmall}`} onClick={reset}
+ disabled={busy === "hear" || voiceBusy}>
               {resetArmed ? "Click again to reset the demo" : "Reset demo"}
             </button>
           </div>

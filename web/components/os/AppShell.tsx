@@ -8,6 +8,7 @@ import VeridianMark from "@/components/VeridianMark";
 import { VeridianCTA, useVeridian } from "@/components/VeridianContext";
 import { IconDesk, IconEvents, IconMic, IconPeople, IconPond, IconSetup, IconToday } from "./Icons";
 import TodayDock from "./TodayDock";
+import ThemeToggle from "./ThemeToggle";
 import { NODE_WORDS, useDeskNode } from "./useDeskNode";
 
 type Item = { label: string; hint?: string; href: string; icon: ReactNode; match: (p: string) => boolean; keepScene: boolean };
@@ -117,7 +118,7 @@ function TabBar({ pathname }: { pathname: string }) {
 export default function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname() || "/";
   const { open } = useVeridian();
-  const showDock = !pathname.startsWith("/desk");
+  const showDock = pathname !== "/desk/focus";
 
   if (pathname === "/desk/focus") return <div className="os-focus">{children}</div>;
 
@@ -129,6 +130,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
           <span className="os-brand-word">Veridian</span>
           <span className="os-brand-tag">desk</span>
         </Link>
+        <div className="os-theme-row"><ThemeToggle /></div>
         <Suspense fallback={<NavList pathname={pathname} qs="" />}>
           <SidebarNav pathname={pathname} />
         </Suspense>
@@ -149,6 +151,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
           <span className="os-brand-word">Veridian</span>
         </Link>
         <div className="os-topbar-right">
+          <ThemeToggle />
           <NodePill />
           <Link href="/setup" prefetch={false} className="os-icon-link" aria-label="Your Veridian settings">
             <IconSetup />
@@ -162,7 +165,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
       <div className="os-content">
         <main className="app-main">{children}</main>
         <footer className="ftr">Demo for Tidepath Family Alliance. Every person, school and dollar here is made up.</footer>
-        {showDock && <TodayDock home={pathname === "/"} />}
+        {showDock && <TodayDock home={pathname === "/"} desk={pathname.startsWith("/desk")} />}
       </div>
 
       <Suspense fallback={null}>

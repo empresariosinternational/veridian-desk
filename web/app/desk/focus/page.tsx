@@ -11,7 +11,7 @@ export default function DeskFocusPage() {
   return (
     <main className="os-focus-main">
       <DeskModeTop focus />
-      <DeskConsole />
+      <DeskConsole stage />
       <DeskLegend />
     </main>
   );
