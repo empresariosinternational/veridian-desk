@@ -670,6 +670,7 @@ export function Board({ id, ctx, compact = false, front = false, personId }: { i
     <section
       className={`${css.board} ${front ? css.boardFront : ""} ${compact ? css.boardCompact : ""} ${ctx.hotBoards.has(hotKey) ? css.hot : ""}`}
       aria-label={person ? `${person.fullName}'s desk` : meta.title}
+      data-board={id}
     >
       <div className={css.boardHead}>
         <h3 className={css.boardTitle}>{person ? `${person.fullName}'s desk` : meta.title}</h3>
