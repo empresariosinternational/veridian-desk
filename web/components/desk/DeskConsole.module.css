@@ -162,10 +162,10 @@
   opacity: 0.35;
   transition: opacity var(--dur) var(--ease), background var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
 }
-.lampRed.lampOn { background: var(--danger); opacity: 1; box-shadow: 0 0 12px var(--danger); }
-.lampAmber.lampOn { background: var(--warning); opacity: 1; box-shadow: 0 0 12px var(--warning); }
-.lampGreen.lampOn { background: var(--success); opacity: 1; box-shadow: 0 0 12px var(--success); }
-.lampIdle.lampOn { background: var(--text-primary); opacity: 0.9; box-shadow: 0 0 8px var(--text-tertiary); }
+.lampRed.lampOn { background: var(--led-red); opacity: 1; box-shadow: 0 0 12px var(--led-red); }
+.lampAmber.lampOn { background: var(--led-amber); opacity: 1; box-shadow: 0 0 12px var(--led-amber); }
+.lampGreen.lampOn { background: var(--led-green); opacity: 1; box-shadow: 0 0 12px var(--led-green); }
+.lampIdle.lampOn { background: var(--led-white); opacity: 1; box-shadow: 0 0 0 1px var(--border-input), 0 0 8px rgba(40, 27, 50, 0.18); }
 .blink { animation: blink 0.9s steps(2, start) infinite; }
 @keyframes blink { to { visibility: hidden; } }
 
@@ -235,7 +235,7 @@
   border-style: solid;
   border-color: var(--danger);
   background: var(--danger);
-  color: var(--btn-primary-bg);
+  color: var(--on-accent);
 }
 .hint { margin: 0; font-size: var(--text-tiny); color: var(--text-tertiary); line-height: var(--lh-normal); }
 .assistant { display: flex; flex-direction: column; gap: var(--sp-2); min-width: 0; }
@@ -298,7 +298,7 @@
   color: var(--text-primary);
   background: var(--surface-3);
 }
-.scriptDone .stepNum { background: var(--success); color: var(--btn-primary-fg); }
+.scriptDone .stepNum { background: var(--success); color: var(--on-accent); }
 
 .last {
   border-radius: var(--r-lg);
@@ -329,7 +329,7 @@
 .tagClinical { color: var(--danger); border-color: var(--danger); }
 .tagOk { color: var(--success); border-color: var(--success); }
 .tagWarn { color: var(--warning); border-color: var(--warning); white-space: normal; overflow-wrap: anywhere; }
-.tagUrgent { color: var(--btn-primary-bg); border-color: var(--danger); background: var(--danger); }
+.tagUrgent { color: var(--on-accent); border-color: var(--danger); background: var(--danger); }
 .tagLang { color: var(--veridian-bright); border-color: var(--veridian); }
 
 /* ---- boards ---- */

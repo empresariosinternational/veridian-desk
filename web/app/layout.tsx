@@ -4,6 +4,9 @@ import { SceneProvider } from "@/components/SceneBridge";
 import VeridianDockHost from "@/components/VeridianDockHost";
 import { VeridianProvider } from "@/components/VeridianContext";
 
+/** Phone browser chrome matches the warm lavender canvas. */
+export const viewport = { themeColor: "#F8F0FE", colorScheme: "light" as const };
+
 export const metadata = {
   title: "agentscene",
   description: "your scene, your agents — events, people, and AI debriefs from the people you follow.",
