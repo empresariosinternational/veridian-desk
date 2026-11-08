@@ -24,10 +24,10 @@ A5 is the hardware **SCL** pin on these boards. An OLED marked SCK must support 
 2. Open `desk_node/desk_node.ino`, select your Uno or classic Nano and serial port, then upload. Close Serial Monitor afterward so the browser can open the port.
 3. Run the web app: `cd web && npm install && npm run dev`. Open **http://localhost:3000/desk** in desktop **Chrome or Edge**. A hosted app must use HTTPS; plain HTTP over a LAN IP does not provide the required browser APIs.
 4. Click **Connect Arduino** and select the board's USB serial port. The app sends status heartbeats at **115200 baud**; the board may reset when the port opens.
-5. Select the speaker and spoken language. Click **Arm**, then move your hand **2–20 cm** in front of the sonar. Allow microphone access when the browser asks.
-6. Keep your hand near the sonar while speaking. Move it at least **30 cm** away, or out of sensor range, for **one continuous second** to **stop and file**. Bringing it back sooner resets the release timer. **Stop and file** also finishes capture. Browser recognition may end sooner and has a 60-second limit. **Disarm**, loss of browser focus, or USB disconnection discards a pending sonar capture.
+5. Select the speaker and spoken language. Click **Arm**, then move your hand **10 cm or less** in front of the sonar. Allow microphone access when the browser asks.
+6. Keep your hand near the sonar while speaking. Move it **beyond 10 cm** to **stop and file immediately** on the first far reading. A missing echo also stops capture. There is no release delay, multi-sample debounce or gesture cooldown. **Stop and file** also finishes capture. Browser recognition may end sooner and has a 60-second limit. **Disarm**, loss of browser focus, or USB disconnection discards a pending sonar capture.
 
-Move the hand away (at least **30 cm**, or out of sensor range) before another gesture. Each successful filing consumes the armed window: click Arm again for the next note. An unused arm expires after two minutes. Holding a hand near the sensor before arming does not start capture; move it away and make a fresh gesture. Manual **Hold to talk** remains available without hardware.
+Move the hand away (**beyond 10 cm**, or out of sensor range) before another gesture. Each successful filing consumes the armed window: click Arm again for the next note. An unused arm expires after two minutes. Holding a hand near the sensor before arming does not start capture; move it away and make a fresh gesture. Manual **Hold to talk** remains available without hardware.
 
 The OLED is optional: if it is absent or allocation fails, sonar and the LED still work. There is no Wi-Fi setup or separate serial bridge service. No application API key is needed for browser speech recognition; the browser may use its own speech service. Only recognized text goes to the desk.
 
@@ -56,7 +56,7 @@ Arduino → browser:
 {"event":"sonar-release"}
 ```
 
-The sonar emits a single `sonar` event after **three consecutive near readings**, only when the browser reports `ARMED`. After a triggered gesture, **one continuous second of clear readings** (at least 30 cm away or no echo) emits one `sonar-release` event and re-enables the gesture. Release is sent even if the browser has not yet reported `LISTENING`, so moving away during a microphone permission prompt cancels that pending capture. Near or intermediate readings reset the release timer. Timing uses elapsed milliseconds without delaying the firmware loop, so sonar sampling, USB commands, LED updates and OLED updates continue during capture. Gestures have a 1.5-second minimum interval. Sampling runs every 80 ms with a bounded 25 ms echo timeout; the 20–30 cm gap provides hysteresis against sensor noise.
+The first valid reading **at or below 10 cm** emits a single `sonar` event, only when the browser reports `ARMED`. The first reading **above 10 cm** (or a missing echo) emits one `sonar-release` event and re-enables the gesture. Release is sent even if the browser has not yet reported `LISTENING`, so moving away during a microphone permission prompt cancels that pending capture. There is no release timer, hysteresis or gesture cooldown. Raw echo duration determines the threshold so a reading just above 10 cm cannot round down and keep capture active. Sampling runs every 80 ms with a bounded 25 ms echo timeout; USB commands, LED updates and OLED updates continue during microphone capture. The browser stops recognition on release and waits asynchronously for the final transcript before filing.
 
 Browser → Arduino, on state changes and every second:
 
@@ -73,6 +73,6 @@ The server's existing `LISTENING` status denotes an armed capture window. The US
 
 ## Firmware checks
 
-Run `python3 firmware/tests/sonar_test.py` from the repository root (requires `g++`). This compiles the actual sketch with simulated hardware and checks trigger/release timing, interrupted far readings, long holds, permission prompts, consent and clock rollover. Physical sensor behavior still needs verification on the board.
+Run `python3 firmware/tests/sonar_test.py` from the repository root (requires `g++`). This compiles the actual sketch with simulated hardware and checks the exact 10 cm threshold, immediate release, fractional readings, long holds, immediate re-entry, missing echoes, permission prompts, consent and clock rollover. Physical sensor behavior still needs verification on the board.
 
 References: [Arduino Uno I²C pin assignments](https://docs.arduino.cc/retired/boards/arduino-uno-rev3-with-long-pins/), [Adafruit SSD1306 setup](https://learn.adafruit.com/monochrome-oled-breakouts/arduino-library-and-examples), [Chrome Web Serial API](https://developer.chrome.com/docs/capabilities/serial).
