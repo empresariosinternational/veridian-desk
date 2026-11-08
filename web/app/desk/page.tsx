@@ -10,7 +10,7 @@ export default function DeskPage() {
   return (
     <>
       <DeskModeTop focus={false} />
-      <DeskConsole />
+      <DeskConsole stage />
     </>
   );
 }
