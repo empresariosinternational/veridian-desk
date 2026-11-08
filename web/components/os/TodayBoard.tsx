@@ -223,8 +223,12 @@ export default function TodayBoard({ weekEvents, sceneQs }: { weekEvents: number
                   </div>
                 </div>
               )}
-              <p>{weekEvents > 0 ? `${weekEvents} ${weekEvents === 1 ? "event" : "events"} in your scene this week.` : "Add follows or cities to fill your week."}</p>
-              <Link href={`/events${sceneQs ? `?${sceneQs}` : ""}`} prefetch={false}>open events</Link>
+              {weekEvents > 0 && (
+                <>
+                  <p>{`${weekEvents} ${weekEvents === 1 ? "event" : "events"} in your scene this week.`}</p>
+                  <Link href={`/events${sceneQs ? `?${sceneQs}` : ""}`} prefetch={false}>open events</Link>
+                </>
+              )}
             </section>
             <section>
               <h2>the pond</h2>
