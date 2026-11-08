@@ -38,6 +38,7 @@ test("the Deepgram stream names the voice and keeps the key out of the URL", () 
   assert.equal(url.searchParams.get("model"), "aura-2-selena-es");
   assert.equal(url.searchParams.get("encoding"), "linear16");
   assert.equal(url.searchParams.get("sample_rate"), "24000");
+  assert.equal(url.searchParams.get("speed"), "1.15");
   assert.equal(url.searchParams.has("api_key"), false);
   assert.equal(url.toString().includes("test-key-not-real"), false);
   const messages = speakMessages("Anotado una vez.");
@@ -47,12 +48,12 @@ test("the Deepgram stream names the voice and keeps the key out of the URL", () 
   ]);
 });
 
-test("the opening sentence is flushed before the rest of the reply", () => {
+test("a reply is spoken as one continuous line", () => {
   const messages = speakMessages("Filed once. The donor is on the board.").map((message) => JSON.parse(message) as { type: string; text?: string });
-  assert.deepEqual(messages[0], { type: "Speak", text: "Filed once." });
-  assert.deepEqual(messages[1], { type: "Flush" });
-  assert.deepEqual(messages[2], { type: "Speak", text: "The donor is on the board." });
-  assert.deepEqual(messages[3], { type: "Flush" });
+  assert.deepEqual(messages, [
+    { type: "Speak", text: "Filed once. The donor is on the board." },
+    { type: "Flush" },
+  ]);
 });
 
 class FakeSocket extends EventTarget {
@@ -129,6 +130,7 @@ test("speak route streams the first audio chunk and does not leak the key", asyn
   assert.equal(url.searchParams.get("model"), "aura-2-vesta-en");
   assert.equal(url.searchParams.get("encoding"), "linear16");
   assert.equal(url.searchParams.get("sample_rate"), "24000");
+  assert.equal(url.searchParams.get("speed"), "1.15");
   assert.equal(opened.url.includes("test-key-not-real"), false);
   assert.equal(opened.options?.headers?.Authorization, "Token test-key-not-real");
   assert.deepEqual(opened.sent.map((message) => JSON.parse(message) as { type: string; text?: string }), [

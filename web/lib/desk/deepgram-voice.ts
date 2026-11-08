@@ -75,8 +75,14 @@ export function voiceFor(lang: Lang): SpokenVoice {
   return voice;
 }
 
-/** 24 kHz linear16 is the streaming format. Playback starts on the first chunk. */
+/** 24 kHz linear16 streams as it is synthesized. Playback starts on the first chunk. */
 export const SPEAK_SAMPLE_RATE = 24_000;
+
+/**
+ * Aura's default pace draws vowels out. 1.15 is one step quicker and keeps
+ * the voice's contour. Deepgram only accepts steps of 0.05.
+ */
+export const SPEAK_SPEED = 1.15;
 
 export class SpeakFailure extends Error {
   constructor(readonly status: 502 | 504, message: string) {
@@ -90,29 +96,16 @@ export function speakStreamUrl(lang: Lang): string {
   url.searchParams.set("model", voice.model);
   url.searchParams.set("encoding", "linear16");
   url.searchParams.set("sample_rate", String(SPEAK_SAMPLE_RATE));
+  url.searchParams.set("speed", String(SPEAK_SPEED));
   return url.toString();
 }
 
-/**
- * Flush the opening sentence before the rest. Aura then sends audio for that
- * sentence while it is still synthesizing what follows.
- */
+/** One Speak and one Flush. Splitting the line makes Aura lengthen each ending. */
 export function speakMessages(text: string): string[] {
-  const { head, rest } = splitForFirstSound(text.trim());
-  const messages = [JSON.stringify({ type: "Speak", text: head }), JSON.stringify({ type: "Flush" })];
-  if (rest) messages.push(JSON.stringify({ type: "Speak", text: rest }), JSON.stringify({ type: "Flush" }));
-  return messages;
-}
-
-export function splitForFirstSound(text: string): { head: string; rest: string } {
-  const sentence = text.match(/^[\s\S]{1,160}?[.!?。](?=\s|$)/);
-  if (sentence && sentence[0].length < text.length) {
-    return { head: sentence[0].trim(), rest: text.slice(sentence[0].length).trim() };
-  }
-  if (text.length <= 160) return { head: text, rest: "" };
-  const space = text.lastIndexOf(" ", 160);
-  const at = space > 40 ? space : 160;
-  return { head: text.slice(0, at).trim(), rest: text.slice(at).trim() };
+  return [
+    JSON.stringify({ type: "Speak", text: text.trim() }),
+    JSON.stringify({ type: "Flush" }),
+  ];
 }
 
 type SocketInit = { headers: Record<string, string> };
