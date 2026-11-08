@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
 import { POST } from "../app/api/desk/speak/route";
 import { cancelSpeech, speakWithPersonality } from "../lib/desk/browser-voice";
-import { assertHumanVoice, speakRequest, voiceFor } from "../lib/desk/deepgram-voice";
+import { assertHumanVoice, speakMessages, speakStreamUrl, voiceFor } from "../lib/desk/deepgram-voice";
 import type { Lang } from "../lib/desk/types";
 
 const originalKey = process.env.DEEPGRAM_API_KEY;
@@ -13,6 +13,8 @@ afterEach(() => {
   if (originalKey === undefined) delete process.env.DEEPGRAM_API_KEY;
   else process.env.DEEPGRAM_API_KEY = originalKey;
   globalThis.fetch = originalFetch;
+  globalThis.WebSocket = originalSocket;
+  FakeSocket.mode = "audio";
 });
 
 test("English and Spanish use Aura-2 people with a human personality", () => {
@@ -29,59 +31,129 @@ test("English and Spanish use Aura-2 people with a human personality", () => {
   assert.equal(english.provider, "deepgram");
 });
 
-test("the Deepgram request names the voice and keeps the key out of the URL", () => {
-  const request = speakRequest("Anotado una vez.", "es", "test-key-not-real");
-  const url = new URL(request.url);
-  assert.equal(`${url.origin}${url.pathname}`, "https://api.deepgram.com/v1/speak");
+test("the Deepgram stream names the voice and keeps the key out of the URL", () => {
+  const url = new URL(speakStreamUrl("es"));
+  assert.equal(url.protocol, "wss:");
+  assert.equal(`${url.host}${url.pathname}`, "api.deepgram.com/v1/speak");
   assert.equal(url.searchParams.get("model"), "aura-2-selena-es");
-  assert.equal(url.searchParams.get("encoding"), "mp3");
-  assert.equal(url.search, "?model=aura-2-selena-es&encoding=mp3");
-  assert.equal(request.init.method, "POST");
-  assert.equal(request.init.body, JSON.stringify({ text: "Anotado una vez." }));
-  const headers = request.init.headers as Record<string, string>;
-  assert.equal(headers.Authorization, "Token test-key-not-real");
+  assert.equal(url.searchParams.get("encoding"), "linear16");
+  assert.equal(url.searchParams.get("sample_rate"), "24000");
   assert.equal(url.searchParams.has("api_key"), false);
-  assert.ok(!request.url.includes("test-key-not-real"));
+  assert.equal(url.toString().includes("test-key-not-real"), false);
+  const messages = speakMessages("Anotado una vez.");
+  assert.deepEqual(messages.map((message) => JSON.parse(message)), [
+    { type: "Speak", text: "Anotado una vez." },
+    { type: "Flush" },
+  ]);
 });
 
-test("speak route returns Vesta audio and does not leak the key", async () => {
+test("the opening sentence is flushed before the rest of the reply", () => {
+  const messages = speakMessages("Filed once. The donor is on the board.").map((message) => JSON.parse(message) as { type: string; text?: string });
+  assert.deepEqual(messages[0], { type: "Speak", text: "Filed once." });
+  assert.deepEqual(messages[1], { type: "Flush" });
+  assert.deepEqual(messages[2], { type: "Speak", text: "The donor is on the board." });
+  assert.deepEqual(messages[3], { type: "Flush" });
+});
+
+class FakeSocket extends EventTarget {
+  static mode: "audio" | "error" | "leak" = "audio";
+  static constructed = 0;
+  static latest: FakeSocket | null = null;
+  url: string;
+  options: { headers?: Record<string, string> } | undefined;
+  binaryType = "blob";
+  readyState = 0;
+  sent: string[] = [];
+  constructor(url: string, options?: { headers?: Record<string, string> }) {
+    super();
+    this.url = url;
+    this.options = options;
+    FakeSocket.constructed += 1;
+    FakeSocket.latest = this;
+    queueMicrotask(() => {
+      if (FakeSocket.mode === "error") {
+        this.dispatchEvent(new Event("error"));
+        return;
+      }
+      this.readyState = 1;
+      this.dispatchEvent(new Event("open"));
+    });
+  }
+  send(data: string) {
+    this.sent.push(data);
+    const message = JSON.parse(data) as { type?: string };
+    if (message.type === "Flush") {
+      queueMicrotask(() => {
+        if (FakeSocket.mode === "leak") {
+          this.dispatchEvent(new MessageEvent("message", { data: JSON.stringify({ description: "test-key-not-real" }) }));
+          this.readyState = 3;
+          this.dispatchEvent(new Event("close"));
+          return;
+        }
+        this.dispatchEvent(new MessageEvent("message", { data: Uint8Array.from([1, 2, 3, 4]).buffer }));
+        this.dispatchEvent(new MessageEvent("message", { data: JSON.stringify({ type: "Flushed", sequence_id: 0 }) }));
+      });
+    }
+    if (message.type === "Close") queueMicrotask(() => { this.readyState = 3; this.dispatchEvent(new Event("close")); });
+  }
+  close() {
+    this.readyState = 3;
+    this.dispatchEvent(new Event("close"));
+  }
+}
+
+const originalSocket = globalThis.WebSocket;
+
+test("speak route streams the first audio chunk and does not leak the key", async () => {
   process.env.DEEPGRAM_API_KEY = "test-key-not-real";
-  const calls: { url: string; authorization: string; body: string }[] = [];
-  globalThis.fetch = async (input, init) => {
-    const headers = init?.headers as Record<string, string>;
-    calls.push({ url: String(input), authorization: headers.Authorization, body: String(init?.body) });
-    return new Response(Uint8Array.from([1, 2, 3, 4]), { status: 200, headers: { "Content-Type": "audio/mpeg" } });
-  };
+  FakeSocket.mode = "audio";
+  FakeSocket.constructed = 0;
+  globalThis.WebSocket = FakeSocket as unknown as typeof WebSocket;
   const response = await POST(new Request("http://desk.local/api/desk/speak", {
     method: "POST",
     body: JSON.stringify({ text: "Filed once.", lang: "en" satisfies Lang }),
   }));
   assert.equal(response.status, 200);
-  assert.equal(response.headers.get("content-type"), "audio/mpeg");
+  assert.equal(response.headers.get("content-type"), "audio/l16; rate=24000; channels=1");
+  assert.equal(response.headers.get("x-audio-sample-rate"), "24000");
   assert.equal(response.headers.get("x-veridian-voice"), "aura-2-vesta-en");
-  assert.deepEqual(Array.from(new Uint8Array(await response.arrayBuffer())), [1, 2, 3, 4]);
-  const url = new URL(calls[0].url);
+  const reader = response.body!.getReader();
+  const first = await reader.read();
+  assert.deepEqual(Array.from(first.value ?? new Uint8Array()), [1, 2, 3, 4]);
+  assert.equal(first.done, false);
+  const socket = FakeSocket as unknown as { constructed: number };
+  assert.equal(socket.constructed, 1);
+  const opened = FakeSocket.latest;
+  assert.ok(opened);
+  const url = new URL(opened.url);
   assert.equal(url.searchParams.get("model"), "aura-2-vesta-en");
-  assert.equal(calls[0].authorization, "Token test-key-not-real");
-  assert.equal(calls[0].body, JSON.stringify({ text: "Filed once." }));
-  assert.ok(!JSON.stringify(calls[0]).includes("api_key="));
+  assert.equal(url.searchParams.get("encoding"), "linear16");
+  assert.equal(url.searchParams.get("sample_rate"), "24000");
+  assert.equal(opened.url.includes("test-key-not-real"), false);
+  assert.equal(opened.options?.headers?.Authorization, "Token test-key-not-real");
+  assert.deepEqual(opened.sent.map((message) => JSON.parse(message) as { type: string; text?: string }), [
+    { type: "Speak", text: "Filed once." },
+    { type: "Flush" },
+    { type: "Close" },
+  ]);
+  await reader.cancel();
 });
 
 test("a missing key or a Deepgram failure never returns audio or the key", async () => {
   delete process.env.DEEPGRAM_API_KEY;
-  let called = 0;
-  globalThis.fetch = async () => { called += 1; return new Response("nope", { status: 500 }); };
+  FakeSocket.constructed = 0;
+  globalThis.WebSocket = FakeSocket as unknown as typeof WebSocket;
   const missing = await POST(new Request("http://desk.local/api/desk/speak", {
     method: "POST",
     body: JSON.stringify({ text: "Hello" }),
   }));
   assert.equal(missing.status, 503);
-  assert.equal(called, 0);
+  assert.equal(FakeSocket.constructed, 0);
   const missingBody = await missing.json();
   assert.match(missingBody.notice, /DEEPGRAM_API_KEY/);
 
   process.env.DEEPGRAM_API_KEY = "test-key-not-real";
-  globalThis.fetch = async () => new Response(JSON.stringify({ err_msg: "test-key-not-real" }), { status: 401 });
+  FakeSocket.mode = "leak";
   const failed = await POST(new Request("http://desk.local/api/desk/speak", {
     method: "POST",
     body: JSON.stringify({ text: "Hello", lang: "es" }),
@@ -90,37 +162,73 @@ test("a missing key or a Deepgram failure never returns audio or the key", async
   const failedBody = await failed.json();
   assert.equal(JSON.stringify(failedBody).includes("test-key-not-real"), false);
   assert.equal((await POST(new Request("http://desk.local/api/desk/speak", { method: "POST", body: JSON.stringify({ text: "" }) }))).status, 400);
+  globalThis.WebSocket = originalSocket;
 });
 
-test("playback asks for a personality voice and never calls speechSynthesis", async () => {
+test("playback starts on the first audio chunk and never calls speechSynthesis", async () => {
   const spoken: unknown[] = [];
   const requests: { url: string; body: string }[] = [];
-  class FakeAudio {
-    onerror: (() => void) | null = null;
-    src = "";
-    play() { return Promise.resolve(); }
-    pause() {}
+  let plays = 0;
+  let releaseRest: () => void = () => undefined;
+  const rest = new Promise<void>((resolve) => { releaseRest = resolve; });
+  let startedPlay: () => void = () => undefined;
+  const started = new Promise<void>((resolve) => { startedPlay = resolve; });
+  class FakeContext {
+    state = "running";
+    currentTime = 3;
+    destination = {};
+    resume() { return Promise.resolve(); }
+    createBuffer(_channels: number, length: number) {
+      return { getChannelData: () => new Float32Array(length) };
+    }
+    createBufferSource() {
+      return {
+        buffer: null as unknown,
+        connect() {},
+        start() { plays += 1; startedPlay(); },
+        stop() {},
+      };
+    }
   }
   const previousWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
-  const previousAudio = Object.getOwnPropertyDescriptor(globalThis, "Audio");
-  const previousCreate = Object.getOwnPropertyDescriptor(URL, "createObjectURL");
-  const previousRevoke = Object.getOwnPropertyDescriptor(URL, "revokeObjectURL");
   Object.defineProperty(globalThis, "window", {
     configurable: true,
-    value: { speechSynthesis: { cancel() {}, speak(utterance: unknown) { spoken.push(utterance); } } },
+    value: {
+      AudioContext: FakeContext,
+      speechSynthesis: { cancel() {}, speak(utterance: unknown) { spoken.push(utterance); } },
+    },
   });
-  Object.defineProperty(globalThis, "Audio", { configurable: true, value: FakeAudio });
-  Object.defineProperty(URL, "createObjectURL", { configurable: true, value: () => "blob:veridian-voice" });
-  Object.defineProperty(URL, "revokeObjectURL", { configurable: true, value: () => undefined });
   globalThis.fetch = async (input, init) => {
     requests.push({ url: String(input), body: String(init?.body) });
-    return new Response(Uint8Array.from([9, 9]), { status: 200, headers: { "Content-Type": "audio/mpeg" } });
+    let sent = 0;
+    const body = new ReadableStream<Uint8Array>({
+      async pull(controller) {
+        if (sent === 0) {
+          sent = 1;
+          controller.enqueue(Uint8Array.of(0, 0));
+          return;
+        }
+        await rest;
+        controller.enqueue(Uint8Array.of(0, 16));
+        controller.close();
+      },
+    });
+    return new Response(body, { status: 200, headers: { "Content-Type": "audio/l16; rate=24000; channels=1", "X-Audio-Sample-Rate": "24000" } });
   };
   try {
     let failures = 0;
-    assert.equal(await speakWithPersonality("Anotado una vez.", "es", () => { failures += 1; }), true);
+    const playing = speakWithPersonality("Anotado una vez.", "es", () => { failures += 1; });
+    const began = await Promise.race([
+      started.then(() => true),
+      new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 500)),
+    ]);
+    assert.equal(began, true);
+    assert.equal(plays, 1);
     assert.equal(failures, 0);
     assert.equal(spoken.length, 0);
+    releaseRest();
+    assert.equal(await playing, true);
+    assert.equal(plays, 2);
     assert.equal(requests[0].url, "/api/desk/speak");
     assert.deepEqual(JSON.parse(requests[0].body), { text: "Anotado una vez.", lang: "es" });
     globalThis.fetch = async () => new Response(JSON.stringify({ ok: false }), { status: 503 });
@@ -128,9 +236,7 @@ test("playback asks for a personality voice and never calls speechSynthesis", as
     assert.equal(failures, 1);
     assert.equal(spoken.length, 0);
   } finally {
-    if (previousWindow) Object.defineProperty(globalThis, "window", previousWindow); else delete (globalThis as { window?: unknown }).window;
-    if (previousAudio) Object.defineProperty(globalThis, "Audio", previousAudio); else delete (globalThis as { Audio?: unknown }).Audio;
-    if (previousCreate) Object.defineProperty(URL, "createObjectURL", previousCreate); else delete (URL as { createObjectURL?: unknown }).createObjectURL;
-    if (previousRevoke) Object.defineProperty(URL, "revokeObjectURL", previousRevoke); else delete (URL as { revokeObjectURL?: unknown }).revokeObjectURL;
+    if (previousWindow) Object.defineProperty(globalThis, "window", previousWindow);
+    else delete (globalThis as { window?: unknown }).window;
   }
 });

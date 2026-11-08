@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import VeridianMark from "@/components/VeridianMark";
 import { SCRIPT } from "@/lib/desk/fallback";
 import { fmtTime } from "@/lib/desk/time";
-import { cancelSpeech, canPlaySpoken, captureSpeech, speakWithPersonality, speechRecognition, type VoiceCapture } from "@/lib/desk/browser-voice";
+import { cancelSpeech, canPlaySpoken, captureSpeech, primeSpokenAudio, speakWithPersonality, speechRecognition, type VoiceCapture } from "@/lib/desk/browser-voice";
 import type { DeskPayload } from "@/lib/desk/payload";
 import type { FunderView } from "@/lib/desk/privacy";
 import type { AssistantMode, AssistantMessage, BoardId, CardRef, ExecutiveTask, HearOutcome, Lang, OrgId, ProfileId } from "@/lib/desk/types";
@@ -183,6 +183,10 @@ export default function DeskConsole() {
       const j = await post<HearResponse>("/api/desk/hear", { ...payload, profileHint: active });
       setBusy(null);
       if (!j) return null;
+      if (j.outcome?.ok && j.outcome.spoken && payload.source !== "typed" && playbackTurn === voiceTurn.current) {
+        spokenRef.current = { text: j.outcome.spoken, lang: j.outcome.lang };
+        void speakWithPersonality(j.outcome.spoken, j.outcome.lang, () => flash("Spoken reply is unavailable. The confirmation is shown below."));
+      }
       apply(j);
       if (payload.source !== "typed" || payload.mode === "file") setLast({ transcript: j.transcript ?? payload.text ?? "", outcome: j.outcome ?? null, voice: j.voice ?? null, notice: j.notice ?? null, at: Date.now() });
       if (j.outcome?.ok) {
@@ -190,11 +194,6 @@ export default function DeskConsole() {
         showCards(j.outcome.cards);
         if (j.outcome.scriptId) setDone((d) => new Set(d).add(j.outcome!.scriptId!));
       } else if (j.notice) flash(j.notice);
-      if (j.outcome?.ok && j.outcome.spoken && payload.source !== "typed" && playbackTurn === voiceTurn.current) {
-        spokenRef.current = { text: j.outcome.spoken, lang: j.outcome.lang };
-        const failed = () => flash("Spoken reply is unavailable. The confirmation is shown below.");
-        void speakWithPersonality(j.outcome.spoken, j.outcome.lang, failed);
-      }
       return j;
     },
     [active, apply, flash, post, showCards],
@@ -213,6 +212,7 @@ export default function DeskConsole() {
   const startTalk = useCallback((source: "manual" | "sonar" = "manual") => {
     if (rec.current || finishingCapture.current || busy || !data) return;
     if (!data.node.armed) return flash("Arm the desk first — consent comes before the mic.");
+    primeSpokenAudio();
     holding.current = true;
     captureSourceRef.current = source;
     setCaptureSource(source);
@@ -426,7 +426,7 @@ export default function DeskConsole() {
           </div>
           {node.presence && <div className={css.presence}>Someone is at the desk.</div>}
           <div className={css.row}>
-            <button type="button" className={`${css.btn} ${css.btnArm}`} onClick={() => nodeEvent("arm")} disabled={working || voiceBusy}>
+            <button type="button" className={`${css.btn} ${css.btnArm}`} onClick={() => { primeSpokenAudio(); void nodeEvent("arm"); }} disabled={working || voiceBusy}>
               Arm
             </button>
             <button type="button" className={css.btn} onClick={() => nodeEvent("disarm")}>
@@ -524,7 +524,7 @@ export default function DeskConsole() {
                 type="button"
                 className={`${css.scriptBtn} ${done.has(l.id) ? css.scriptDone : ""}`}
                 disabled={busy === "hear" || voiceBusy}
-                onClick={() => hear({ text: l.text, source: "script" })}
+                onClick={() => { primeSpokenAudio(); void hear({ text: l.text, source: "script" }); }}
               >
                 <span className={css.stepNum}>{l.step}</span>
                 <span>

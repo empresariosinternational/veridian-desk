@@ -75,20 +75,191 @@ export function voiceFor(lang: Lang): SpokenVoice {
   return voice;
 }
 
-export function speakRequest(text: string, lang: Lang, key: string): { url: string; init: RequestInit } {
+/** 24 kHz linear16 is the streaming format. Playback starts on the first chunk. */
+export const SPEAK_SAMPLE_RATE = 24_000;
+
+export class SpeakFailure extends Error {
+  constructor(readonly status: 502 | 504, message: string) {
+    super(message);
+  }
+}
+
+export function speakStreamUrl(lang: Lang): string {
   const voice = voiceFor(lang);
-  const url = new URL("https://api.deepgram.com/v1/speak");
+  const url = new URL("wss://api.deepgram.com/v1/speak");
   url.searchParams.set("model", voice.model);
-  url.searchParams.set("encoding", "mp3");
+  url.searchParams.set("encoding", "linear16");
+  url.searchParams.set("sample_rate", String(SPEAK_SAMPLE_RATE));
+  return url.toString();
+}
+
+/**
+ * Flush the opening sentence before the rest. Aura then sends audio for that
+ * sentence while it is still synthesizing what follows.
+ */
+export function speakMessages(text: string): string[] {
+  const { head, rest } = splitForFirstSound(text.trim());
+  const messages = [JSON.stringify({ type: "Speak", text: head }), JSON.stringify({ type: "Flush" })];
+  if (rest) messages.push(JSON.stringify({ type: "Speak", text: rest }), JSON.stringify({ type: "Flush" }));
+  return messages;
+}
+
+export function splitForFirstSound(text: string): { head: string; rest: string } {
+  const sentence = text.match(/^[\s\S]{1,160}?[.!?。](?=\s|$)/);
+  if (sentence && sentence[0].length < text.length) {
+    return { head: sentence[0].trim(), rest: text.slice(sentence[0].length).trim() };
+  }
+  if (text.length <= 160) return { head: text, rest: "" };
+  const space = text.lastIndexOf(" ", 160);
+  const at = space > 40 ? space : 160;
+  return { head: text.slice(0, at).trim(), rest: text.slice(at).trim() };
+}
+
+type SocketInit = { headers: Record<string, string> };
+
+function createSpeakSocket(url: string, key: string): WebSocket {
+  const Socket = WebSocket as unknown as new (address: string, init?: SocketInit) => WebSocket;
+  const socket = new Socket(url, { headers: { Authorization: `Token ${key}` } });
+  socket.binaryType = "arraybuffer";
+  return socket;
+}
+
+function pcmBytes(data: unknown): Uint8Array | null {
+  if (data instanceof ArrayBuffer) return new Uint8Array(data);
+  if (ArrayBuffer.isView(data)) return new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
+  return null;
+}
+
+type PcmQueue = { next(timeoutMs: number): Promise<Uint8Array | null> };
+
+function queuePcm(socket: WebSocket, flushes: number): PcmQueue {
+  const queue: Uint8Array[] = [];
+  let closed = false;
+  let notify: (() => void) | null = null;
+  let seenFlushes = 0;
+  const wake = () => {
+    const ready = notify;
+    notify = null;
+    ready?.();
+  };
+  const accept = (data: unknown) => {
+    const bytes = pcmBytes(data);
+    if (bytes?.byteLength) {
+      queue.push(bytes);
+      wake();
+      return;
+    }
+    if (typeof data !== "string") return;
+    try {
+      const message = JSON.parse(data) as { type?: string };
+      if (message.type !== "Flushed") return;
+      seenFlushes += 1;
+      if (seenFlushes >= flushes && socket.readyState === 1) socket.send(JSON.stringify({ type: "Close" }));
+    } catch {
+      // Control text is never forwarded. It can echo request details.
+    }
+  };
+  let incoming = Promise.resolve();
+  socket.addEventListener("message", (event: MessageEvent) => {
+    if (typeof Blob !== "undefined" && event.data instanceof Blob) {
+      const blob = event.data;
+      incoming = incoming.then(async () => accept(await blob.arrayBuffer())).catch(() => undefined);
+      return;
+    }
+    accept(event.data);
+  });
+  socket.addEventListener("close", () => {
+    closed = true;
+    wake();
+  });
+  socket.addEventListener("error", () => {
+    closed = true;
+    wake();
+  });
   return {
-    url: url.toString(),
-    init: {
-      method: "POST",
-      headers: {
-        Authorization: `Token ${key}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ text }),
+    async next(timeoutMs: number) {
+      const deadline = Date.now() + timeoutMs;
+      for (;;) {
+        const chunk = queue.shift();
+        if (chunk) return chunk;
+        if (closed) return null;
+        const remaining = deadline - Date.now();
+        if (remaining <= 0) throw new SpeakFailure(504, "Deepgram took too long. The words are still on screen.");
+        await new Promise<void>((resolve) => {
+          const timer = setTimeout(resolve, remaining);
+          notify = () => {
+            clearTimeout(timer);
+            resolve();
+          };
+        });
+      }
     },
   };
+}
+
+async function waitUntilOpen(socket: WebSocket): Promise<void> {
+  if (socket.readyState === 1) return;
+  await new Promise<void>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new SpeakFailure(504, "Deepgram took too long. The words are still on screen.")), 5_000);
+    const finish = (error?: SpeakFailure) => {
+      clearTimeout(timer);
+      socket.removeEventListener("open", onOpen);
+      socket.removeEventListener("error", onError);
+      if (error) reject(error);
+      else resolve();
+    };
+    const onOpen = () => finish();
+    const onError = () => finish(new SpeakFailure(502, "Deepgram could not speak that. The words are still on screen."));
+    socket.addEventListener("open", onOpen);
+    socket.addEventListener("error", onError);
+  });
+}
+
+/** Stream Aura-2 audio. The first chunk is available before the rest of the line is synthesized. */
+export async function spokenAudio(text: string, lang: Lang, key: string): Promise<ReadableStream<Uint8Array>> {
+  const messages = speakMessages(text);
+  const socket = createSpeakSocket(speakStreamUrl(lang), key);
+  try {
+    await waitUntilOpen(socket);
+  } catch (error) {
+    try { socket.close(); } catch { /* Already closed. */ }
+    throw error;
+  }
+  const flushes = messages.filter((message) => (JSON.parse(message) as { type?: string }).type === "Flush").length;
+  const queue = queuePcm(socket, flushes);
+  for (const message of messages) socket.send(message);
+
+  async function* chunks(): AsyncGenerator<Uint8Array> {
+    let started = false;
+    try {
+      for (;;) {
+        const chunk = await queue.next(started ? 12_000 : 8_000);
+        if (!chunk) {
+          if (!started) throw new SpeakFailure(502, "Deepgram returned silence. The words are still on screen.");
+          return;
+        }
+        started = true;
+        yield chunk;
+      }
+    } finally {
+      try { socket.close(); } catch { /* Already closed. */ }
+    }
+  }
+
+  const upcoming = chunks();
+  const first = await upcoming.next();
+  if (first.done) throw new SpeakFailure(502, "Deepgram returned silence. The words are still on screen.");
+  return new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(first.value);
+    },
+    async pull(controller) {
+      const next = await upcoming.next();
+      if (next.done) controller.close();
+      else controller.enqueue(next.value);
+    },
+    cancel() {
+      void upcoming.return(undefined);
+    },
+  });
 }

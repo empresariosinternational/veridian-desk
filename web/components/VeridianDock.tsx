@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import VeridianMark from "./VeridianMark";
 import { useVeridian } from "./VeridianContext";
-import { cancelSpeech, captureSpeech, speakWithPersonality, speechRecognition, type VoiceCapture } from "@/lib/desk/browser-voice";
+import { cancelSpeech, captureSpeech, primeSpokenAudio, speakWithPersonality, speechRecognition, type VoiceCapture } from "@/lib/desk/browser-voice";
 import { applyTaskActions, loadTasks, localDay, saveTasks, sortTasks, taskStorageKey, type Message, type Priority, type Suggestion, type Task, type TaskAction } from "@/lib/veridian/tasks";
 import type { Lang } from "@/lib/desk/types";
 
@@ -132,11 +132,10 @@ export default function VeridianDock() {
       if (!mounted.current) return;
       if (!response.ok || !result.ok || !result.reply) throw new Error(result.notice ?? "I couldn't answer just now. Your tasks haven't changed; please try again.");
       if (result.actions?.length) commit(result.actions);
-      setMessages((previous) => [...previous, { role: "assistant", text: result.reply, suggestions: result.suggestions ?? [] }].slice(-24) as Message[]);
       if (source === "voice" && readReplies && epoch === voiceEpoch.current) {
-        const failed = () => setNotice("Spoken reply is unavailable. You can read the reply above.");
-        void speakWithPersonality(result.reply, result.lang ?? "en", failed);
+        void speakWithPersonality(result.reply, result.lang ?? "en", () => setNotice("Spoken reply is unavailable. You can read the reply above."));
       }
+      setMessages((previous) => [...previous, { role: "assistant", text: result.reply, suggestions: result.suggestions ?? [] }].slice(-24) as Message[]);
     } catch (error) {
       if (!mounted.current) return;
       const message = (error as Error).name === "AbortError" ? "That took too long. Your tasks haven't changed; please try again." : (error as Error).message;
@@ -152,6 +151,7 @@ export default function VeridianDock() {
 
   const startVoice = () => {
     if (busyRef.current || captureRef.current) return;
+    primeSpokenAudio();
     setNotice(null); cancelSpeech(); holdingRef.current = true;
     try {
       const capture = captureSpeech(voiceLanguage);

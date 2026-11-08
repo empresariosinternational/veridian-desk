@@ -85,56 +85,111 @@ export function captureSpeech(language: string, Constructor = speechRecognition(
   return { result, stop, abort };
 }
 
+const SPEAK_SAMPLE_RATE = 24_000;
+
 let generation = 0;
-let playing: { pause(): void; src: string } | null = null;
-let objectUrl: string | null = null;
+let audioContext: AudioContext | null = null;
+let sources: AudioBufferSourceNode[] = [];
+let nextAt = 0;
+let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
+
+function audioContextConstructor(): (new (options?: AudioContextOptions) => AudioContext) | null {
+  if (typeof window === "undefined") return null;
+  const browser = window as typeof window & { webkitAudioContext?: new (options?: AudioContextOptions) => AudioContext };
+  return window.AudioContext ?? browser.webkitAudioContext ?? null;
+}
 
 export function canPlaySpoken(): boolean {
-  return typeof window !== "undefined" && typeof Audio !== "undefined";
+  return audioContextConstructor() !== null;
+}
+
+/** Call from the click or key that leads to a reply so the first chunk can play immediately. */
+export function primeSpokenAudio(): void {
+  const Context = audioContextConstructor();
+  if (!Context) return;
+  if (!audioContext) audioContext = new Context({ latencyHint: "interactive" });
+  if (audioContext.state === "suspended") void audioContext.resume();
 }
 
 export function cancelSpeech(): void {
   generation += 1;
   if (typeof window !== "undefined" && "speechSynthesis" in window) window.speechSynthesis.cancel();
-  if (playing) {
-    playing.pause();
-    playing.src = "";
-    playing = null;
+  reader?.cancel().catch(() => undefined);
+  reader = null;
+  for (const source of sources) {
+    try { source.stop(); } catch { /* Already finished. */ }
   }
-  if (objectUrl) {
-    URL.revokeObjectURL(objectUrl);
-    objectUrl = null;
-  }
+  sources = [];
+  nextAt = 0;
 }
 
-/** Ask the server for a Deepgram voice and play that audio. Never starts speechSynthesis. */
+function takeSamples(pending: Uint8Array, incoming: Uint8Array): { samples: Int16Array; pending: Uint8Array } {
+  const merged = new Uint8Array(pending.length + incoming.length);
+  merged.set(pending);
+  merged.set(incoming, pending.length);
+  const even = merged.length - (merged.length % 2);
+  const pcm = new Uint8Array(even);
+  pcm.set(merged.subarray(0, even));
+  return { samples: new Int16Array(pcm.buffer), pending: merged.subarray(even) };
+}
+
+function schedule(ctx: AudioContext, samples: Int16Array, rate: number): void {
+  if (!samples.length) return;
+  const buffer = ctx.createBuffer(1, samples.length, rate);
+  const channel = buffer.getChannelData(0);
+  for (let i = 0; i < samples.length; i += 1) channel[i] = samples[i] / 32_768;
+  const source = ctx.createBufferSource();
+  source.buffer = buffer;
+  source.connect(ctx.destination);
+  const startAt = Math.max(ctx.currentTime, nextAt);
+  source.start(startAt);
+  nextAt = startAt + buffer.duration;
+  sources.push(source);
+}
+
+/** Play Deepgram audio as the first samples arrive. Never waits for the whole line, and never uses speechSynthesis. */
 export async function speakWithPersonality(text: string, lang: Lang, onError: () => void): Promise<boolean> {
   cancelSpeech();
   const mine = generation;
   const spoken = text.trim();
-  if (!spoken || !canPlaySpoken()) {
-    if (spoken) onError();
-    return false;
-  }
+  let started = false;
   try {
-    const response = await fetch("/api/desk/speak", {
+    primeSpokenAudio();
+    if (!spoken || !audioContext) {
+      if (spoken) onError();
+      return false;
+    }
+    const ctx = audioContext;
+    const responsePromise = fetch("/api/desk/speak", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text: spoken.slice(0, 1000), lang }),
     });
+    if (ctx.state === "suspended") await ctx.resume();
+    const response = await responsePromise;
     if (mine !== generation) return false;
-    if (!response.ok) throw new Error("Deepgram voice unavailable");
-    const blob = await response.blob();
-    if (mine !== generation) return false;
-    if (!blob.size) throw new Error("empty audio");
-    objectUrl = URL.createObjectURL(blob);
-    const audio = new Audio(objectUrl);
-    playing = audio;
-    audio.onerror = () => { if (mine === generation) onError(); };
-    await audio.play();
+    if (!response.ok || !response.body) throw new Error("Deepgram voice unavailable");
+    const headerRate = Number(response.headers.get("x-audio-sample-rate"));
+    const rate = [8_000, 16_000, 24_000, 32_000, 48_000].includes(headerRate) ? headerRate : SPEAK_SAMPLE_RATE;
+    reader = response.body.getReader();
+    let pending = new Uint8Array(0);
+    while (mine === generation) {
+      const { done, value } = await reader.read();
+      if (mine !== generation) return false;
+      if (done) break;
+      if (!value?.byteLength) continue;
+      const split = takeSamples(pending, value);
+      pending = split.pending;
+      if (!split.samples.length) continue;
+      schedule(ctx, split.samples, rate);
+      started = true;
+    }
+    if (!started) throw new Error("empty audio");
     return mine === generation;
   } catch {
-    if (mine === generation) onError();
+    if (mine !== generation) return false;
+    if (started) return true;
+    onError();
     return false;
   }
 }
