@@ -1,5 +1,6 @@
 /** Shared response shape for desk routes (server-only). */
 
+import { deepgramKey, voiceFor } from "./deepgram-voice";
 import { assistantModel, openaiKey } from "./openai";
 import { nodeView } from "./node";
 import { persistenceOk } from "./store";
@@ -17,7 +18,16 @@ export function deskPayload(state: DeskState, now: Date) {
   return {
     state,
     node: nodeView(state, now),
-    voiceReady: { provider: "browser", requiresKey: false, creoleLive: false },
+    voiceReady: {
+      provider: "deepgram" as const,
+      requiresKey: true,
+      configured: Boolean(deepgramKey()),
+      creoleLive: false,
+      voices: {
+        en: { name: voiceFor("en").name, model: voiceFor("en").model, personality: voiceFor("en").personality },
+        es: { name: voiceFor("es").name, model: voiceFor("es").model, personality: voiceFor("es").personality },
+      },
+    },
     assistantReady: { key: Boolean(openaiKey()), model: assistantModel() },
     persistence: persistenceOk(),
     today,

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import VeridianMark from "@/components/VeridianMark";
 import { SCRIPT } from "@/lib/desk/fallback";
 import { fmtTime } from "@/lib/desk/time";
-import { cancelSpeech, canSpeak, captureSpeech, speakInBrowser, speechRecognition, type VoiceCapture } from "@/lib/desk/browser-voice";
+import { cancelSpeech, canPlaySpoken, captureSpeech, speakWithPersonality, speechRecognition, type VoiceCapture } from "@/lib/desk/browser-voice";
 import type { DeskPayload } from "@/lib/desk/payload";
 import type { FunderView } from "@/lib/desk/privacy";
 import type { AssistantMode, AssistantMessage, BoardId, CardRef, ExecutiveTask, HearOutcome, Lang, OrgId, ProfileId } from "@/lib/desk/types";
@@ -83,7 +83,7 @@ export default function DeskConsole() {
   }, []);
 
   useEffect(() => {
-    setBrowserVoice({ recognition: Boolean(speechRecognition()), playback: canSpeak() });
+    setBrowserVoice({ recognition: Boolean(speechRecognition()), playback: canPlaySpoken() });
     const onBlur = () => cancelTalk();
     window.addEventListener("blur", onBlur);
     return () => {
@@ -192,8 +192,8 @@ export default function DeskConsole() {
       } else if (j.notice) flash(j.notice);
       if (j.outcome?.ok && j.outcome.spoken && payload.source !== "typed" && playbackTurn === voiceTurn.current) {
         spokenRef.current = { text: j.outcome.spoken, lang: j.outcome.lang };
-        const failed = () => flash("Browser speech playback is unavailable. The confirmation is shown below.");
-        if (!speakInBrowser(j.outcome.spoken, j.outcome.lang, failed)) failed();
+        const failed = () => flash("Spoken reply is unavailable. The confirmation is shown below.");
+        void speakWithPersonality(j.outcome.spoken, j.outcome.lang, failed);
       }
       return j;
     },
@@ -372,9 +372,10 @@ export default function DeskConsole() {
             <p className={css.subtitle}>Say it once. The desk files it, routes the urgent thing, and keeps private things private.</p>
           </div>
         </div>
-        <span className={`${css.pill} ${browserVoice.recognition ? css.pillOk : css.pillWarn}`}>
-          {browserVoice.recognition ? "Browser voice · no key needed" : "Browser speech unavailable — type a note"}
+        <span className={`${css.pill} ${voiceReady.configured ? css.pillOk : css.pillWarn}`}>
+          {voiceReady.configured ? `Deepgram · ${voiceReady.voices.en.name} & ${voiceReady.voices.es.name}` : "Deepgram voice unavailable"}
         </span>
+        {!browserVoice.recognition && <span className={`${css.pill} ${css.pillWarn}`}>Microphone unavailable — type a note</span>}
         <span className={`${css.pill} ${css.pillOk}`}>{data.assistantReady.key ? "OpenAI GPT · ready" : "Desk rules · ready"}</span>
         <span className={`${css.pill} ${css.pillVeridian}`}>{giveMiamiDay.label}</span>
         {!data.persistence && <span className={`${css.pill} ${css.pillWarn}`}>running from memory</span>}
@@ -478,7 +479,7 @@ export default function DeskConsole() {
             </button>
           )}
           <p className={css.hint}>
-            Arm, then keep your hand within 10 cm of the sonar while speaking, or hold to talk. Move beyond 10 cm to stop and file immediately. Browser recognition may end sooner; Disarm cancels capture. Your browser handles speech recognition and spoken confirmations without an API key. Only the transcript goes to the desk. Your browser may use its own speech service.
+            Arm, then keep your hand within 10 cm of the sonar while speaking, or hold to talk. Move beyond 10 cm to stop and file immediately. Browser recognition may end sooner; Disarm cancels capture. The browser recognizes speech. Deepgram speaks the confirmation. Only the transcript goes to the desk.
             {!voiceReady.creoleLive && " Creole notes are entered by staff."}
           </p>
 
@@ -505,7 +506,7 @@ export default function DeskConsole() {
                 {spokenRef.current && browserVoice.playback && (
                   <button type="button" className={`${css.btn} ${css.btnGhost} ${css.btnSmall}`} disabled={voiceBusy} onClick={() => {
                     const spoken = spokenRef.current;
-                    if (spoken) speakInBrowser(spoken.text, spoken.lang, () => flash("Browser speech playback is unavailable."));
+                    if (spoken) void speakWithPersonality(spoken.text, spoken.lang, () => flash("Spoken reply is unavailable. The confirmation is shown below."));
                   }}>
                     ▶ replay
                   </button>

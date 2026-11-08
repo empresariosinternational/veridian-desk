@@ -180,8 +180,9 @@ test("browser voice works without a key and still requires Arm", async () => {
   assert.equal(data.ok, true); assert.equal(data.assistant.status, "fallback");
   assert.equal(data.outcome.lang, "es"); assert.equal(data.state.notes[0].dataClass, "OPERATIONAL");
   assert.match(data.state.notes[0].text, /Hoy puedo manejar/);
-  assert.equal(data.voiceReady.provider, "browser"); assert.equal(data.voiceReady.requiresKey, false);
-  assert.match(data.voice.via, /browser voice/);
+  assert.equal(data.voiceReady.provider, "deepgram"); assert.equal(data.voiceReady.requiresKey, true);
+  assert.equal(data.voiceReady.voices.es.model, "aura-2-selena-es");
+  assert.match(data.voice.via, /Deepgram Selena/);
   assert.ok(data.outcome.spoken); assert.equal(data.speech, undefined);
   assert.ok(!data.notice.includes("OPENAI_API_KEY")); assert.equal(requests.length, 0);
   const repeatedWithoutArm = await send(body);

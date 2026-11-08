@@ -1,4 +1,4 @@
-/** Server-only OpenAI configuration for GPT chat and planning. Voice lives in the browser. */
+/** Server-only OpenAI configuration for GPT chat and planning. Spoken replies use Deepgram. */
 import OpenAI, { APIConnectionTimeoutError, APIUserAbortError } from "openai";
 
 export function openaiKey(): string | null {

@@ -1,8 +1,9 @@
 # Veridian Desk
 
+
 **Say it once. The desk files it, routes the urgent thing the same day, and keeps private things private.**
 
-Veridian Desk is an assistant for nonprofits, communities, and the people in them. Chat with the desk, plan the day's executive tasks, or say a fact once and file it. The browser handles microphone speech recognition and spoken confirmations with no application API key. OpenAI optionally powers GPT chat and planning. The desk merges duplicate donors, turns workshop requests into approval checklists, keeps counseling detail out of funder reports, and drafts grant updates from a truth ledger. The same network staffs shifts and proposes public needs for both communities to approve.
+Veridian Desk is an assistant for nonprofits, communities, and the people in them. Chat with the desk, plan the day's executive tasks, or say a fact once and file it. The browser handles microphone speech recognition. Spoken replies use Deepgram Aura-2: Vesta in English and Selena in Spanish. OpenAI optionally powers GPT chat and planning. The desk merges duplicate donors, turns workshop requests into approval checklists, keeps counseling detail out of funder reports, and drafts grant updates from a truth ledger. The same network staffs shifts and proposes public needs for both communities to approve.
 
 Built at the DevDay Exchange · Codex Hackathon for Miami's Non-Profits (The LAB Miami, Nov 7–8, 2026) for the six Tidepath Family Alliance challenges and the Mangrove Mews bonus. Veridian is the assistant layer; the web app around it is Agentscene. All people, organizations, schools, donors and amounts in the demo are fictional.
 
@@ -17,21 +18,21 @@ npm run desk:test              # OpenAI integration tests using a local API fixt
 npm run veridian:test          # VCTA chat, task commands, and task validation
 ```
 
-Voice and desk-rule filing need no key. Open `/desk`, allow microphone access, press **Arm**, then hold **Hold to talk** and release to file. Choose English or Español with **Spoken language**. A browser with Web Speech recognition is required; unsupported browsers can use typed notes and demo buttons. Browser speech services may need a network connection even though the app requires no voice key.
+Desk-rule filing needs no key. Spoken replies need a server-side `DEEPGRAM_API_KEY`. Open `/desk`, allow microphone access, press **Arm**, then hold **Hold to talk** and release to file. Choose English or Español with **Spoken language**. A browser with Web Speech recognition is required; unsupported browsers can use typed notes and demo buttons. The header pill reads **Deepgram · Vesta & Selena** when the key is set.
 
 For GPT chat and executive planning, optionally set the server-side `OPENAI_API_KEY` in your shell, `web/.env.local`, or the Vercel project environment. Keep the Vercel project root at `web/`. No browser key or `NEXT_PUBLIC_` key is needed. Redeploy after changing hosted environment variables.
 
 Open `/desk` and select a profile. **Chat** supports follow-up questions with a separate conversation per profile. **Plan my day** proposes prioritized tasks with owners, dates, and approval requirements from current desk work. **File a note** updates boards through validated tools. Chat and planning do not file notes or execute proposed tasks; existing approval controls handle offers, workshops, and network matches.
 
-The only model setting is the optional `OPENAI_MODEL=gpt-4.1-mini` override in `web/.env.example`. The GPT model must support the Responses API and Structured Outputs. Voice uses the browser's built-in speech APIs and available voices.
+The only model setting is the optional `OPENAI_MODEL=gpt-4.1-mini` override in `web/.env.example`. The GPT model must support the Responses API and Structured Outputs. Spoken replies use Deepgram Aura-2 (`aura-2-vesta-en` and `aura-2-selena-es`). The key stays on the server.
 
-No OpenAI key or an upstream outage? Voice still works, and filing uses the desk rules. GPT chat and planning on `/desk` show an error without creating records. The VCTA also supports direct task commands without GPT. Browser playback failures leave successfully filed work intact and the written confirmation visible.
+No OpenAI key or an upstream outage? Filing uses the desk rules. GPT chat and planning on `/desk` show an error without creating records. The VCTA also supports direct task commands without GPT. If Deepgram cannot speak, the filed work stays intact and the written confirmation stays on screen.
 
 ## Ask Veridian from any page
 
 **Ask Veridian** is the VCTA in the sticky navigation. It opens a conversation beside the current page, leaving navigation available. Conversation and drafts stay in place while moving through the main navigation or minimizing the panel.
 
-Type a message or hold **Hold to talk**, then release to send. Browser speech recognition and spoken replies need no voice-provider key. **My priorities** lets you add tasks, change priority and due dates, mark work done, and reopen it. Tasks are saved in this browser across reloads; conversation stays in memory for the current visit.
+Type a message or hold **Hold to talk**, then release to send. The microphone uses the browser. Spoken replies use the same Deepgram voices as the desk. **My priorities** lets you add tasks, change priority and due dates, mark work done, and reopen it. Tasks are saved in this browser across reloads; conversation stays in memory for the current visit.
 
 With GPT configured, Veridian uses your task list and current page to help plan and update work. Proposed next steps have an **Add to my tasks** button. Without GPT, direct commands still work: “Add call the school tomorrow”, “Make call the school high priority”, “Complete call the school”, or **Plan my day**. The VCTA does not send messages or change external calendars.
 
@@ -57,7 +58,7 @@ mic (push-to-talk or Arduino sonar, after Arm) → browser SpeechRecognition →
   → web/lib/desk/agent.ts    executes a validated filing plan, or offline rules on provider failure
   → web/lib/desk/tools.ts    plain functions file the work, keyed so nothing doubles
   → web/data/desk-state.json one JSON file; no database, no login
-  → browser speechSynthesis speaks one short confirmation for voice/demo input
+  → POST /api/desk/speak     Deepgram Aura-2 speaks one short confirmation
   → /desk                    the board in front changes with the speaker
 ```
 
@@ -69,7 +70,7 @@ mic (push-to-talk or Arduino sonar, after Arm) → browser SpeechRecognition →
 - **Learning, honestly.** One remembered preference: Marisol's call list grouped by school.
 - **Haitian Creole.** Live Creole audio has not been verified for this demo; staff can enter notes as text.
 
-The implementation follows the official [Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs) documentation and the browser [SpeechRecognition](https://developer.mozilla.org/en-US/docs/Web/API/SpeechRecognition) and [SpeechSynthesis](https://developer.mozilla.org/en-US/docs/Web/API/SpeechSynthesis) APIs.
+The implementation follows the official [Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs) documentation, the browser [SpeechRecognition](https://developer.mozilla.org/en-US/docs/Web/API/SpeechRecognition) API, and Deepgram [Aura-2 text to speech](https://developers.deepgram.com/docs/tts-models).
 
 ## Hardware
 

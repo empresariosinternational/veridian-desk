@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { detectSpeaker, processUtterance } from "@/lib/desk/agent";
+import { voiceFor } from "@/lib/desk/deepgram-voice";
 import { aiError, assistantModel, openaiKey } from "@/lib/desk/openai";
 import { planUtterance, validatePlan } from "@/lib/desk/planner";
 import { failSoft, filed, working } from "@/lib/desk/node";
@@ -83,7 +84,7 @@ export async function POST(req: Request) {
   }
 
   voice.via = plan ? "OpenAI GPT" : "filed by desk rules";
-  if (source !== "typed") voice.via += " · browser voice";
+  if (source !== "typed") voice.via += ` · Deepgram ${voiceFor(outcome.lang).name}`;
   const { state } = await mutate((s) => {
     const name = s.profiles[who].name;
     if (outcome.ok) filed(s, plan && !plan.actions.length ? `Replied — ${name}` : outcome.alreadyFiled ? `Already filed — ${name}` : `Filed once — ${name}`, new Date());
