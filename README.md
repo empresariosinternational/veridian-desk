@@ -1,6 +1,7 @@
 # Veridian Desk
 
 
+
 **Say it once. The desk files it, routes the urgent thing the same day, and keeps private things private.**
 
 Veridian Desk is an assistant for nonprofits, communities, and the people in them. Chat with the desk, plan the day's executive tasks, or say a fact once and file it. The browser handles microphone speech recognition. Spoken replies use Deepgram Aura-2: Vesta in English and Selena in Spanish. OpenAI optionally powers GPT chat and planning. The desk merges duplicate donors, turns workshop requests into approval checklists, keeps counseling detail out of funder reports, and drafts grant updates from a truth ledger. The same network staffs shifts and proposes public needs for both communities to approve.
