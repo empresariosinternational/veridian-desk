@@ -5,7 +5,7 @@ import AddHost from "@/components/AddHost";
 import EventTimeline from "@/components/EventTimeline";
 import FollowsWithChat from "@/components/FollowsWithChat";
 import VeridianDebrief, { type DebriefItem } from "@/components/VeridianDebrief";
-import DashboardGreeting from "@/components/DashboardGreeting";
+import TodayBoard from "@/components/os/TodayBoard";
 import CalendarCard from "@/components/CalendarCard";
 import CrmPipelineCard from "@/components/CrmPipelineCard";
 import { SceneBridgeSync } from "@/components/SceneBridge";
@@ -40,6 +40,12 @@ export default async function Home({ searchParams }: { searchParams: SP }) {
     .sort((a, b) => (a.start! < b.start! ? -1 : 1))
     .slice(0, 10);
 
+  const weekStart = Date.now() - 3_600_000;
+  const weekEnd = Date.now() + 7 * 86_400_000;
+  const weekCount = [...allEvents, ...data.elsewhere].filter((e) => {
+    const t = e.start ? Date.parse(e.start) : NaN;
+    return Number.isFinite(t) && t >= weekStart && t <= weekEnd;
+  }).length;
   const featuredEvents = allEvents
     .filter((e) => e.overlap > 1)
     .sort((a, b) => b.overlap - a.overlap)
@@ -88,12 +94,14 @@ export default async function Home({ searchParams }: { searchParams: SP }) {
         eventCount={totalEvents}
       />
 
+      <TodayBoard weekEvents={weekCount} sceneQs={sceneQs} />
+
       <FadeIn>
-        <DashboardGreeting
-          hostCount={Object.keys(data.people).length}
-          eventCount={totalEvents}
-          cityCount={cities.length}
-        />
+        <div className="os-scene-head">
+          <div className="eyebrow">your scene · {totalEvents} events · {cities.length} {cities.length === 1 ? "city" : "cities"}</div>
+          <h2>what your people are throwing</h2>
+          <p className="sub">Events, hosts and briefs from the organizers you follow. Add anyone to people (CRM) or copy a draft.</p>
+        </div>
       </FadeIn>
 
       <FadeIn delay={0.04}>

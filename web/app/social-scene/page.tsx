@@ -5,6 +5,7 @@ import { isSocialSceneEnabled } from "@/lib/social-scene";
 import FadeIn from "@/components/motion/FadeIn";
 import VeridianMark from "@/components/VeridianMark";
 import SocialSceneWorkspace from "@/components/social-scene/SocialSceneWorkspace";
+import PondMarketplace from "@/components/os/PondMarketplace";
 
 export const revalidate = 1800;
 
@@ -25,20 +26,22 @@ export default async function SocialScenePondPage({ searchParams }: { searchPara
 
   return (
     <>
+      <PondMarketplace />
       <FadeIn>
-        <div className="dash-hero-brand" style={{ marginBottom: 8 }}>
-          <VeridianMark size={18} />
-          <span className="veridian-tag">social scene</span>
-        </div>
-        <div className="eyebrow">network marketplace · the pond</div>
-        <h1>social scene</h1>
-        <p className="sub" style={{ marginTop: 8 }}>
+        <div className="os-scene-head">
+          <div className="dash-hero-brand" style={{ marginBottom: 8 }}>
+            <VeridianMark size={18} />
+            <span className="veridian-tag">social scene</span>
+          </div>
+          <h2>your social scene</h2>
+          <p className="sub" style={{ marginTop: 8 }}>
           curate communities, showcase any legal business, and let Veridian + plugged-in agents
           grow your network — from coffee shops to F500.{" "}
           {!isSocialSceneEnabled() && (
             <span className="cal-demo-badge">flag off</span>
           )}
-        </p>
+          </p>
+        </div>
       </FadeIn>
       <FadeIn delay={0.05}>
         <SocialSceneWorkspace digest={digest} sceneQs={sceneQs} mode="pond" />

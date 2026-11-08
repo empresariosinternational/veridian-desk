@@ -1,5 +1,5 @@
 import "./globals.css";
-import SiteHeader from "@/components/SiteHeader";
+import AppShell from "@/components/os/AppShell";
 import { SceneProvider } from "@/components/SceneBridge";
 import VeridianDockHost from "@/components/VeridianDockHost";
 import { VeridianProvider } from "@/components/VeridianContext";
@@ -24,11 +24,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <SceneProvider>
           <VeridianProvider>
-            <SiteHeader />
-            <main className="app-main">{children}</main>
-            <footer className="ftr">
-              your follows · your zip · your URL. CRM on-device. no signup, no DB.
-            </footer>
+            <AppShell>{children}</AppShell>
             <VeridianDockHost />
           </VeridianProvider>
         </SceneProvider>

@@ -1,6 +1,6 @@
 import { arm, disarm, nodeView, presence } from "@/lib/desk/node";
 import { deskPayload, NO_STORE } from "@/lib/desk/payload";
-import { mutate } from "@/lib/desk/store";
+import { openDesk } from "@/lib/desk/store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,8 +16,11 @@ type NodeEvent = "arm" | "disarm" | "presence" | "button";
  */
 export async function POST(req: Request) {
   let event: NodeEvent | undefined;
+  let clientState: unknown;
   try {
-    event = ((await req.json()) as { event?: NodeEvent }).event;
+    const body = (await req.json()) as { event?: NodeEvent; state?: unknown };
+    event = body.event;
+    clientState = body.state;
   } catch {
     return Response.json({ ok: false, error: "Send JSON: { event }" }, { status: 400, headers: NO_STORE });
   }
@@ -25,7 +28,7 @@ export async function POST(req: Request) {
     return Response.json({ ok: false, error: "event must be arm, disarm, presence or button" }, { status: 400, headers: NO_STORE });
   }
   const now = new Date();
-  const { state } = await mutate((s) => {
+  const { state } = await openDesk(clientState).mutate((s) => {
     if (event === "arm") arm(s, now);
     else if (event === "disarm") disarm(s, now);
     else if (event === "presence") presence(s, now);

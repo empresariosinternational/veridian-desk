@@ -1,13 +1,60 @@
 "use client";
 
-import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useMemo, useRef, useState, type MutableRefObject, type ReactNode } from "react";
 import VeridianMark from "./VeridianMark";
+import { applyTaskActions, loadTasks, saveTasks, type TaskAction } from "@/lib/veridian/tasks";
 
-const Context = createContext<{ open: boolean; setOpen: (open: boolean) => void } | null>(null);
+type Source = "typed" | "voice";
+
+/** Filled in by the Veridian panel once it mounts; pages call it through the context. */
+export type VeridianBridge = {
+  submit?: (text: string, source: Source) => void;
+  addTasks?: (actions: TaskAction[]) => boolean;
+  showTasks?: () => void;
+};
+
+type VeridianContextValue = {
+  open: boolean;
+  setOpen: (open: boolean) => void;
+  /** Open the panel and send this to Veridian, typed or as a voice transcript. */
+  ask: (text: string, source?: Source) => void;
+  /** Add to My priorities, even before the panel has loaded. */
+  addTasks: (actions: TaskAction[]) => boolean;
+  /** Open the panel on My priorities. */
+  showTasks: () => void;
+  bridge: MutableRefObject<VeridianBridge>;
+  pending: MutableRefObject<{ text: string; source: Source } | null>;
+};
+
+const Context = createContext<VeridianContextValue | null>(null);
 
 export function VeridianProvider({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
-  const value = useMemo(() => ({ open, setOpen }), [open]);
+  const bridge = useRef<VeridianBridge>({});
+  const pending = useRef<{ text: string; source: Source } | null>(null);
+
+  const ask = useCallback((text: string, source: Source = "typed") => {
+    if (!text.trim()) return;
+    setOpen(true);
+    if (bridge.current.submit) bridge.current.submit(text, source);
+    else pending.current = { text, source };
+  }, []);
+
+  const addTasks = useCallback((actions: TaskAction[]) => {
+    if (bridge.current.addTasks) return bridge.current.addTasks(actions);
+    try {
+      return saveTasks(applyTaskActions(loadTasks(), actions));
+    } catch {
+      return false;
+    }
+  }, []);
+
+  const showTasks = useCallback(() => {
+    setOpen(true);
+    bridge.current.showTasks?.();
+  }, []);
+
+  const value = useMemo(() => ({ open, setOpen, ask, addTasks, showTasks, bridge, pending }), [open, ask, addTasks, showTasks]);
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }
 
@@ -17,7 +64,7 @@ export function useVeridian() {
   return context;
 }
 
-/** VCTA stays in the sticky navigation while the panel opens beside the current view. */
+/** VCTA opens the Veridian panel beside the current view. */
 export function VeridianCTA() {
   const { open, setOpen } = useVeridian();
   return (

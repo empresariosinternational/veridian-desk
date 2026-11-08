@@ -1,5 +1,5 @@
 import { deskPayload, NO_STORE } from "@/lib/desk/payload";
-import { mutate } from "@/lib/desk/store";
+import { openDesk } from "@/lib/desk/store";
 import { acceptMatch } from "@/lib/desk/tools";
 import type { OrgId } from "@/lib/desk/types";
 
@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
  * is rejected.
  */
 export async function POST(req: Request) {
-  let body: { matchId?: string; orgId?: OrgId };
+  let body: { matchId?: string; orgId?: OrgId; state?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -24,6 +24,6 @@ export async function POST(req: Request) {
     return Response.json({ ok: false, error: "matchId and orgId (tidepath | mangrove) are required" }, { status: 400, headers: NO_STORE });
   }
   const now = new Date();
-  const { state, result } = await mutate((s) => acceptMatch(s, body.matchId!, body.orgId!, now));
+  const { state, result } = await openDesk(body.state).mutate((s) => acceptMatch(s, body.matchId!, body.orgId!, now));
   return Response.json({ ...result, ...deskPayload(state, now) }, { status: result.ok ? 200 : 422, headers: NO_STORE });
 }

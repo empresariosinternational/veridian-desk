@@ -1,4 +1,5 @@
 import DeskConsole from "@/components/desk/DeskConsole";
+import { DeskModeTop } from "@/components/os/DeskModeBar";
 
 export const metadata = {
   title: "Veridian Desk · agentscene",
@@ -6,5 +7,10 @@ export const metadata = {
 };
 
 export default function DeskPage() {
-  return <DeskConsole />;
+  return (
+    <>
+      <DeskModeTop focus={false} />
+      <DeskConsole />
+    </>
+  );
 }
