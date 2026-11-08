@@ -13,12 +13,12 @@ import { NODE_WORDS, useDeskNode } from "./useDeskNode";
 type Item = { label: string; hint?: string; href: string; icon: ReactNode; match: (p: string) => boolean; keepScene: boolean };
 
 const ITEMS: Item[] = [
-  { label: "today", hint: "brief + dock", href: "/", icon: <IconToday />, match: (p) => p === "/", keepScene: true },
-  { label: "the pond", hint: "marketplace", href: "/social-scene", icon: <IconPond />, match: (p) => p.startsWith("/social-scene"), keepScene: true },
-  { label: "people", hint: "crm", href: "/crm", icon: <IconPeople />, match: (p) => p.startsWith("/crm") || p.startsWith("/profile"), keepScene: true },
-  { label: "events", href: "/events", icon: <IconEvents />, match: (p) => p.startsWith("/events") || p.startsWith("/c/"), keepScene: true },
-  { label: "desk", hint: "voice + node", href: "/desk", icon: <IconDesk />, match: (p) => p.startsWith("/desk"), keepScene: false },
-  { label: "setup", hint: "your veridian", href: "/setup", icon: <IconSetup />, match: (p) => p.startsWith("/setup"), keepScene: false },
+  { label: "Home", hint: "start here", href: "/", icon: <IconToday />, match: (p) => p === "/", keepScene: true },
+  { label: "The Desk", hint: "say it once", href: "/desk", icon: <IconDesk />, match: (p) => p.startsWith("/desk"), keepScene: false },
+  { label: "People", hint: "donors, families", href: "/crm", icon: <IconPeople />, match: (p) => p.startsWith("/crm") || p.startsWith("/profile"), keepScene: true },
+  { label: "Partners", hint: "local groups", href: "/social-scene", icon: <IconPond />, match: (p) => p.startsWith("/social-scene"), keepScene: true },
+  { label: "Events", hint: "around Miami", href: "/events", icon: <IconEvents />, match: (p) => p.startsWith("/events") || p.startsWith("/c/"), keepScene: true },
+  { label: "Settings", hint: "your assistant", href: "/setup", icon: <IconSetup />, match: (p) => p.startsWith("/setup"), keepScene: false },
 ];
 
 /** Keep the Luma scene (?cities=…&follows=…) on every link, like the old header did. */
@@ -64,11 +64,11 @@ function NodeCard() {
     <div className="os-node-card">
       <Link href="/desk" prefetch={false} className="os-node-line">
         <span className={`os-node-dot os-node-${node?.color ?? "gray"}${node?.blink ? " is-blinking" : ""}`} aria-hidden />
-        <span>front desk node</span>
+        <span>Desk button</span>
         <span className="os-node-word">{word}</span>
       </Link>
-      <p>Press the node's button to arm the mic for one capture.</p>
-      <Link href="/desk/focus" prefetch={false} className="os-node-mode">Open desk mode</Link>
+      <p>Press the button on the front desk and say one thing. It gets filed.</p>
+      <Link href="/desk/focus" prefetch={false} className="os-node-mode">Open front-desk screen</Link>
     </div>
   );
 }
@@ -91,7 +91,7 @@ function TabBar({ pathname }: { pathname: string }) {
     return (
       <Link key={it.href} href={`${it.href}${it.keepScene ? qs : ""}`} prefetch={false} className={active ? "is-active" : undefined} aria-current={active ? "page" : undefined}>
         {it.icon}
-        <span>{it.label === "the pond" ? "pond" : it.label}</span>
+        <span>{it.label === "The Desk" ? "Desk" : it.label}</span>
       </Link>
     );
   };
@@ -103,7 +103,7 @@ function TabBar({ pathname }: { pathname: string }) {
         <IconMic size={24} />
       </button>
       {tab(ITEMS[2])}
-      {tab(ITEMS[4])}
+      {tab(ITEMS[3])}
     </nav>
   );
 }
@@ -117,17 +117,17 @@ function TabBar({ pathname }: { pathname: string }) {
 export default function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname() || "/";
   const { open } = useVeridian();
-  const isToday = pathname === "/";
+  const showDock = !pathname.startsWith("/desk");
 
   if (pathname === "/desk/focus") return <div className="os-focus">{children}</div>;
 
   return (
     <div className={`os-shell${open ? " os-panel-open" : ""}`}>
       <aside className="os-sidebar" aria-label="Veridian OS">
-        <Link href="/" prefetch={false} className="os-brand" aria-label="agentscene home">
+        <Link href="/" prefetch={false} className="os-brand" aria-label="Veridian home">
           <VeridianMark size={22} />
-          <span className="os-brand-word">agentscene</span>
-          <span className="os-brand-tag">veridian os</span>
+          <span className="os-brand-word">Veridian</span>
+          <span className="os-brand-tag">desk</span>
         </Link>
         <Suspense fallback={<NavList pathname={pathname} qs="" />}>
           <SidebarNav pathname={pathname} />
@@ -144,9 +144,9 @@ export default function AppShell({ children }: { children: ReactNode }) {
       </aside>
 
       <header className="os-topbar">
-        <Link href="/" prefetch={false} className="os-brand" aria-label="agentscene home">
+        <Link href="/" prefetch={false} className="os-brand" aria-label="Veridian home">
           <VeridianMark size={22} />
-          <span className="os-brand-word">agentscene</span>
+          <span className="os-brand-word">Veridian</span>
         </Link>
         <div className="os-topbar-right">
           <NodePill />
@@ -161,8 +161,8 @@ export default function AppShell({ children }: { children: ReactNode }) {
 
       <div className="os-content">
         <main className="app-main">{children}</main>
-        <footer className="ftr">your follows · your zip · your URL. CRM on-device. no signup, no DB.</footer>
-        {isToday && <TodayDock />}
+        <footer className="ftr">Demo for Tidepath Family Alliance. Every person, school and dollar here is made up.</footer>
+        {showDock && <TodayDock home={pathname === "/"} />}
       </div>
 
       <Suspense fallback={null}>

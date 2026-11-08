@@ -14,7 +14,7 @@ export default function ArduinoNode({ status, urgent, line, onTrigger, onRelease
 }) {
   const [connection, setConnection] = useState<ArduinoConnection | null>(null);
   const [connecting, setConnecting] = useState(false);
-  const [notice, setNotice] = useState("Connect Arduino to enable the sonar microphone trigger.");
+  const [notice, setNotice] = useState("Plug in the desk device to talk by waving a hand.");
   const connectionRef = useRef<ArduinoConnection | null>(null);
   const mounted = useRef(false);
   const callbacks = useRef({ onTrigger, onRelease, onDisconnect });
@@ -74,7 +74,7 @@ export default function ArduinoNode({ status, urgent, line, onTrigger, onRelease
     <div>
       <button type="button" className={`${css.btn} ${css.btnSmall}`} disabled={connecting}
         onClick={() => connection ? void connection.close() : void connect()}>
-        {connecting ? "Connecting Arduino…" : connection ? "Disconnect Arduino" : "Connect Arduino"}
+        {connecting ? "Connecting the desk device…" : connection ? "Unplug desk device" : "Connect desk device"}
       </button>
       <p className={css.hint} role="status">{notice}</p>
     </div>

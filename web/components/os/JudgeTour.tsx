@@ -65,7 +65,7 @@ const STEPS: Step[] = [
     kicker: "Challenge 6 · Claudette, director",
     title: "Grant reports that sound like us and say only what's true.",
     body: "Claudette says: “Draft the county quarterly update. Only what is true.”",
-    look: "Look at Grants: every number in the draft points to a line in the truth ledger, and the spending rule from the funder is stated. Press “Try to add a number” on that board: any figure that is not in the ledger is removed.",
+    look: "Look at Grants: every number in the draft points to a line in the facts log, and the spending rule from the funder is stated. Press “Try to add a number” on that board: any figure that is not in the ledger is removed.",
     run: "claudette",
   },
   {
@@ -93,7 +93,7 @@ const STEPS: Step[] = [
     kicker: "Your turn",
     title: "Try it with your own words.",
     body:
-      "Pick any person at the top of the desk and type or say something in the box on the left, in English or Spanish. Use Chat to ask a question, or Plan my day for a prioritized task list. Press Arm, then hold Hold to talk to use the microphone.",
+      "Pick any person at the top of the desk and type or say something in the box on the left, in English or Spanish. Use Chat to ask a question, or Plan my day for a prioritized task list. Tap Start listening, then hold the talk button to use the microphone.",
     look: "Say it once. Filed once. The right person and the other community answered the same day.",
     cta: "Finish",
   },
@@ -111,9 +111,9 @@ export default function JudgeTour() {
 
   useEffect(() => {
     try {
-      if (!window.localStorage.getItem(SEEN_KEY)) setOpen(true);
+      if (window.location.pathname === "/desk" && !window.localStorage.getItem(SEEN_KEY)) setOpen(true);
     } catch {
-      setOpen(true);
+      /* storage blocked */
     }
   }, []);
 
@@ -173,7 +173,7 @@ export default function JudgeTour() {
     return (
       <button type="button" className={css.launcher} onClick={() => setOpen(true)} aria-label="Open the 2-minute tour">
         <span className={css.launcherDot} aria-hidden="true" />
-        Tour · 2 min
+        See how it works · 2 min
       </button>
     );
   }

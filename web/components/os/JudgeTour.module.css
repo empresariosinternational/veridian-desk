@@ -1,5 +1,5 @@
 .launcher {
-  position: fixed; right: 24px; bottom: 24px; z-index: 60;
+  position: fixed; right: 24px; bottom: 104px; z-index: 60;
   display: inline-flex; align-items: center; gap: 8px;
   height: 36px; padding: 0 14px; border-radius: 999px;
   background: var(--veridian-bright, #6335BE); color: #fff;
@@ -34,7 +34,7 @@
 .count { display: block; margin-top: 10px; font-size: 12px; color: var(--ink-soft, #5b4f6e); }
 
 @media (max-width: 720px) {
-  .launcher { bottom: 96px; right: 14px; }
+  .launcher { bottom: 92px; right: 12px; }
   .panel { left: 10px; right: 10px; width: auto; top: auto; bottom: 10px; max-height: 52vh; padding: 14px 16px 12px; border-radius: 16px; }
   .title { font-size: 17px; }
   .body, .look { font-size: 14px; }

@@ -161,7 +161,7 @@ export default function CrmWorkspace({ following, people, events }: Props) {
         </div>
         <div className="crm-tools">
           <button type="button" className="crm-btn" onClick={onImportScene}>
-            import from scene
+            import events
           </button>
           <button type="button" className="crm-btn ghost" onClick={onExport}>
             export
@@ -185,7 +185,7 @@ export default function CrmWorkspace({ following, people, events }: Props) {
       <div className="crm-add-row">
         <input
           className="crm-search"
-          placeholder="search contacts…"
+          placeholder="Search your contacts"
           value={q}
           onChange={(e) => setQ(e.target.value)}
           aria-label="search contacts"
@@ -200,7 +200,7 @@ export default function CrmWorkspace({ following, people, events }: Props) {
           <input
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
-            placeholder="add contact by name"
+            placeholder="Add someone by name"
             aria-label="new contact name"
           />
           <button type="submit" className="crm-btn">
@@ -216,7 +216,7 @@ export default function CrmWorkspace({ following, people, events }: Props) {
           {filtered.length === 0 && (
             <li className="crm-empty">
               {store.contacts.length === 0
-                ? "no contacts yet — import from your scene to start."
+                ? "No contacts yet. Type a name above to add one."
                 : "no matches."}
             </li>
           )}
@@ -250,7 +250,7 @@ export default function CrmWorkspace({ following, people, events }: Props) {
         <div className="crm-detail" aria-live="polite">
           {!active && (
             <p className="sub" style={{ margin: 0 }}>
-              select a contact to edit notes, status, and follow-ups.
+              Pick someone to add notes and a reminder to follow up.
             </p>
           )}
           {active && (

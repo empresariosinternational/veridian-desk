@@ -40,10 +40,10 @@ export default async function EventsPage({ searchParams }: { searchParams: SP })
   return (
     <>
       <FadeIn>
-        <div className="eyebrow">events</div>
-        <h1>events</h1>
+        <div className="eyebrow">Events</div>
+        <h1>What is coming up</h1>
         <p className="sub" style={{ marginTop: 8 }}>
-          Your community dates, and what the people you follow are throwing. Veridian staffs the dates on Today.
+          Tidepath’s big dates first, then other events around Miami. When a date needs helpers, Veridian lines them up for you.
         </p>
       </FadeIn>
 
@@ -57,7 +57,7 @@ export default async function EventsPage({ searchParams }: { searchParams: SP })
                   <h2>Give Miami Day</h2>
                   <p>{fmtDay(gmd.date)} · {gmd.daysAway === 0 ? "today" : gmd.daysAway === 1 ? "tomorrow" : `${gmd.daysAway} days away`}. Event helpers and thank-yous run through Today and the desk.</p>
                   <div className="os-move-actions">
-                    <Link href={`/${sceneQs ? `?${sceneQs}` : ""}`} prefetch={false} className="os-btn">Staff it on Today</Link>
+                    <Link href={`/${sceneQs ? `?${sceneQs}` : ""}`} prefetch={false} className="os-btn">Line up helpers</Link>
                     <Link href="/desk" prefetch={false} className="os-btn-ghost">Open the desk</Link>
                   </div>
                 </div>
@@ -66,7 +66,7 @@ export default async function EventsPage({ searchParams }: { searchParams: SP })
           )}
 
           <FadeIn delay={0.06}>
-            <h2 className="dash-section-title">coming up in your scene</h2>
+            <h2 className="dash-section-title">Other events around Miami</h2>
             {upcoming.length > 0 ? (
               <EventTimeline events={upcoming} people={data.people} />
             ) : (

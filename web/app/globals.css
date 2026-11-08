@@ -2669,7 +2669,7 @@ a.ss-card:hover {
 .os-dock-mic.is-listening { background: var(--danger); box-shadow: 0 0 0 6px rgba(193, 51, 47, 0.22); }
 .os-dock-mic:disabled { opacity: .45; cursor: default; }
 .os-dock-notice { margin: 0; padding: 8px 14px; border-radius: var(--r-pill); background: var(--surface-solid); border: 1px solid var(--border-strong); font-size: 13px; color: var(--text-secondary); }
-@media (max-width: 1023px) { .os-dock { bottom: 76px; padding: 10px 12px 8px; } }
+@media (max-width: 1023px) { .os-dock { bottom: 76px; padding: 10px 12px 8px; } .os-dock { display: none; } }
 
 /* The Pond */
 .os-pond { container-type: inline-size; display: flex; flex-direction: column; gap: 32px; padding-top: 16px; }

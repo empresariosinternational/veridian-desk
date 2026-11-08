@@ -20,7 +20,7 @@ export function DeskModeTop({ focus }: { focus: boolean }) {
       {focus ? (
         <Link href="/desk" prefetch={false} className="os-btn-ghost">Exit desk mode</Link>
       ) : (
-        <Link href="/desk/focus" prefetch={false} className="os-btn-ghost">Open desk mode</Link>
+        <Link href="/desk/focus" prefetch={false} className="os-btn-ghost">Front-desk screen</Link>
       )}
     </div>
   );

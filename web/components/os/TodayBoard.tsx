@@ -177,7 +177,7 @@ export default function TodayBoard({ weekEvents, sceneQs }: { weekEvents: number
           {snap
             ? live.length
               ? `Veridian lined up ${live.length} ${live.length === 1 ? "move" : "moves"} for your goals. Approve the ones you like. Nothing leaves your team without you.`
-              : "You're clear for now. Veridian brings the next move here as the desk and The Pond change."
+              : "You're clear for now. Veridian brings the next move here as the desk and partners change."
             : failed
               ? "The desk isn't answering right now, so moves will appear once it's back."
               : "Veridian is lining up today's moves…"}
@@ -232,7 +232,7 @@ export default function TodayBoard({ weekEvents, sceneQs }: { weekEvents: number
             </section>
             <section>
               <h2>the pond</h2>
-              <p>{ripples.length ? `${ripples.length} ripples are waiting: ${ripples[0].needer.name} and ${ripples[0].offerer.name} first.` : "No ripples yet. Join The Pond so Veridian can match you."}</p>
+              <p>{ripples.length ? `${ripples.length} partner matches are waiting: ${ripples[0].needer.name} and ${ripples[0].offerer.name} first.` : "No partner matches yet. Join The Pond so Veridian can match you."}</p>
               <Link href={`/social-scene${sceneQs ? `?${sceneQs}` : ""}`} prefetch={false}>open the pond</Link>
             </section>
             <section>

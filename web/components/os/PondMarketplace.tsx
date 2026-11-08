@@ -38,27 +38,27 @@ export default function PondMarketplace() {
 
   return (
     <section className="os-pond" aria-labelledby="os-pond-title">
-      {joined && mine && <p className="os-flash" role="status">{mine.name} is on The Pond. Veridian will look for ripples with your offers and needs.</p>}
+      {joined && mine && <p className="os-flash" role="status">{mine.name} is listed. Veridian will look for groups that fit what you give and need.</p>}
       <div className="os-pond-hero">
         <div>
           <div className="os-eyebrow-row">
-            <span className="eyebrow">network marketplace · the pond</span>
-            <span className="os-demo-tag">demo communities</span>
+            <span className="eyebrow">Partners · groups helping groups</span>
+            <span className="os-demo-tag">sample groups</span>
           </div>
-          <h1 id="os-pond-title">the pond</h1>
-          <p className="sub">Communities list what they offer and what they need. Veridian finds the ripples, the matches between them, and nothing is shared until both sides say yes.</p>
+          <h1 id="os-pond-title">Find a group that has what you need</h1>
+          <p className="sub">Each local group lists what it can give and what it needs. Veridian spots the pairs that fit, like a parent circle with spare volunteers and a nonprofit short on event help. Nothing is shared until both groups say yes.</p>
         </div>
         <div className="os-pond-ctas">
-          <Link href="/social-scene/join" prefetch={false} className="os-btn os-btn-lg">{mine ? "Edit my listing" : "Join The Pond"}</Link>
-          <Link href="/social-scene/join?step=3" prefetch={false} className="os-btn-ghost os-btn-lg">Promote my community</Link>
+          <Link href="/social-scene/join" prefetch={false} className="os-btn os-btn-lg">{mine ? "Edit my listing" : "List my group"}</Link>
+          <Link href="/social-scene/join?step=3" prefetch={false} className="os-btn-ghost os-btn-lg">Share my group</Link>
         </div>
       </div>
 
       <div className="os-filter">
         <label className="os-search">
           <IconSearch />
-          <span className="vcta-sr-only">Search The Pond</span>
-          <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search communities, offers, needs" />
+          <span className="vcta-sr-only">Search partners</span>
+          <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search groups, what they give, what they need" />
         </label>
         <div className="os-filter-chips" role="group" aria-label="Filter by goal">
           <button type="button" aria-pressed={goal === "all"} onClick={() => setGoal("all")}>all</button>
@@ -70,7 +70,7 @@ export default function PondMarketplace() {
 
       {ripples.length > 0 && (
         <section aria-labelledby="os-ripples">
-          <h2 id="os-ripples" className="os-h2">ripples</h2>
+          <h2 id="os-ripples" className="os-h2">Good matches right now</h2>
           <div className="os-ripples">
             {ripples.map((r) => {
               const done = proposed.includes(r.id);
@@ -90,16 +90,16 @@ export default function PondMarketplace() {
                   <p className="os-ripple-why">{r.why}</p>
                   <div className="os-move-actions">
                     {done ? (
-                      <span className="os-added">Ripple on your priorities</span>
+                      <span className="os-added">Added to your to-do list</span>
                     ) : (
                       <button
                         type="button"
                         className="os-btn"
                         onClick={() => {
-                          if (addTasks([{ type: "add", id: null, title: `Propose a ripple: ${r.needer.name} ↔ ${r.offerer.name} (${r.need})`, priority: "normal", dueDate: null }])) setProposed([...proposed, r.id]);
+                          if (addTasks([{ type: "add", id: null, title: `Suggest a match: ${r.needer.name} ↔ ${r.offerer.name} (${r.need})`, priority: "normal", dueDate: null }])) setProposed([...proposed, r.id]);
                         }}
                       >
-                        Propose ripple
+                        Suggest this match
                       </button>
                     )}
                     <button type="button" className="os-btn-ghost" onClick={() => ask(`Draft a short intro between ${r.needer.name}, who needs ${r.need}, and ${r.offerer.name}, who offers ${r.offer}. Use only their public Pond profiles. Both sides approve before it's sent.`)}>Draft intro</button>
@@ -113,9 +113,9 @@ export default function PondMarketplace() {
       )}
 
       <section aria-labelledby="os-communities">
-        <h2 id="os-communities" className="os-h2">communities</h2>
+        <h2 id="os-communities" className="os-h2">All groups</h2>
         {shown.length === 0 ? (
-          <p className="sub">No communities match that yet. Try another goal or search.</p>
+          <p className="sub">No groups match that yet. Try another filter or search.</p>
         ) : (
           <div className="os-communities">
             {shown.map((c) => (
@@ -146,7 +146,7 @@ export default function PondMarketplace() {
         )}
       </section>
 
-      <p className="os-privacy"><IconLock size={16} />The Pond only sees what a community marks public: name, area, languages, offers and needs. Never notes, donors or case records.</p>
+      <p className="os-privacy"><IconLock size={16} />Partners only see what a group marks public: name, area, languages, offers and needs. Never notes, donors or case records.</p>
     </section>
   );
 }

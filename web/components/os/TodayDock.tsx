@@ -10,7 +10,7 @@ import { IconMic, IconSend } from "./Icons";
  * Option A's dock on Today: type or hold the mic, and the Veridian panel opens
  * beside the page with the answer (spoken back when you talked).
  */
-export default function TodayDock() {
+export default function TodayDock({ home = false }: { home?: boolean }) {
   const { ask, open } = useVeridian();
   const [text, setText] = useState("");
   const [lang, setLang] = useState<"en-US" | "es-US">("en-US");
@@ -80,12 +80,12 @@ export default function TodayDock() {
   };
 
   return (
-    <div className={`os-dock${open ? " is-panel-open" : ""}`}>
+    <div className={`os-dock${open ? " is-panel-open" : ""}${home ? " is-home" : ""}`}>
       {notice && <p className="os-dock-notice" role="status">{notice}</p>}
       <form className="os-dock-bar" onSubmit={(e) => { e.preventDefault(); send(); }}>
         <VeridianMark size={18} />
         <label className="vcta-sr-only" htmlFor="os-dock-input">Ask Veridian</label>
-        <input id="os-dock-input" value={text} maxLength={1000} onChange={(e) => setText(e.target.value)} placeholder={listening ? "Listening… let go to send" : "Ask Veridian, or hold the mic and talk"} disabled={listening} autoComplete="off" />
+        <input id="os-dock-input" value={text} maxLength={1000} onChange={(e) => setText(e.target.value)} placeholder={listening ? "Listening… let go to send" : "Ask anything, or hold the mic and talk"} disabled={listening} autoComplete="off" />
         <button type="button" className="os-dock-lang" onClick={() => setLang(lang === "en-US" ? "es-US" : "en-US")} aria-label={`Voice language: ${lang === "en-US" ? "English" : "Spanish"}. Switch`} disabled={listening}>
           {lang === "en-US" ? "EN" : "ES"}
         </button>

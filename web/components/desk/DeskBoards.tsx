@@ -41,8 +41,8 @@ export const BOARD_META: Record<BoardId, { title: string; owner: string }> = {
   recruiting: { title: "Recruiting", owner: "Owen · volunteers" },
   grants: { title: "Grants", owner: "Claudette · director" },
   colony: { title: "Colonies", owner: "Beatriz · Mangrove Mews" },
-  network: { title: "Network", owner: "B2B · public needs only" },
-  person: { title: "Personal desk", owner: "B2C" },
+  network: { title: "Network", owner: "shared with partners · public needs only" },
+  person: { title: "Personal desk", owner: "just for you" },
 };
 
 const LANG: Record<Lang, string> = { en: "English", es: "Español", ht: "Kreyòl" };
@@ -157,7 +157,7 @@ function Calls({ ctx, compact }: { ctx: BoardCtx; compact: boolean }) {
             </div>
           )}
           <div className={ctx.hot.has("ledger:q4-missed-session-followups") ? css.hot : ""}>
-            <p className={css.label}>Quarterly report · from the truth ledger</p>
+            <p className={css.label}>Quarterly report · from the facts log</p>
             <table className={css.ledger}>
               <tbody>
                 {program.map((e) => (
@@ -373,7 +373,7 @@ function Recruiting({ ctx, compact }: { ctx: BoardCtx; compact: boolean }) {
               <div className={css.itemTop}>
                 <span className={css.itemTitle}>Asked {name(state, r.personId)}</span>
                 <span className={`${css.tag} ${r.status === "accepted" ? css.tagOk : r.status === "declined" ? "" : css.tagWarn}`}>{r.status}</span>
-                <span className={css.tag}>B2C</span>
+                <span className={css.tag}>Personal</span>
               </div>
               <span className={css.itemSub}>
                 {shift ? `${shift.role} · ${shift.area}` : "shift"} — why: “{r.reason}”
@@ -476,7 +476,7 @@ function Grants({ ctx, compact }: { ctx: BoardCtx; compact: boolean }) {
             )}
           </div>
           <div>
-            <p className={css.label}>Truth ledger</p>
+            <p className={css.label}>Facts log</p>
             <table className={css.ledger}>
               <tbody>
                 {Object.values(state.ledger).map((e) => (
@@ -674,7 +674,7 @@ export function Board({ id, ctx, compact = false, front = false, personId }: { i
     >
       <div className={css.boardHead}>
         <h3 className={css.boardTitle}>{person ? `${person.fullName}'s desk` : meta.title}</h3>
-        <span className={css.boardOwner}>{person ? "B2C · personal desk" : meta.owner}</span>
+        <span className={css.boardOwner}>{person ? "Personal desk" : meta.owner}</span>
       </div>
       {id === "calls" && <Calls ctx={ctx} compact={compact} />}
       {id === "donors" && <Donors ctx={ctx} compact={compact} />}

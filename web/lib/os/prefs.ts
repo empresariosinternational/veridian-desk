@@ -23,7 +23,7 @@ export const GOALS: { id: GoalId; label: string; hint: string }[] = [
   { id: "recruiting", label: "recruiting", hint: "volunteers, mentors and hires" },
   { id: "events", label: "events", hint: "workshops and community days" },
   { id: "fundraising", label: "fundraising", hint: "donors and thank-yous" },
-  { id: "bd", label: "BD", hint: "partners and sponsors" },
+  { id: "bd", label: "sponsors", hint: "partners and sponsors" },
   { id: "volunteering", label: "volunteering", hint: "help other communities" },
 ];
 
@@ -31,7 +31,7 @@ export const AUTONOMY: { id: Autonomy; label: string; blurb: string }[] = [
   { id: "suggest", label: "suggest", blurb: "Recommendations only" },
   { id: "draft", label: "draft", blurb: "Veridian prepares, you send" },
   { id: "supervised", label: "supervised", blurb: "Works within your limits and tells you" },
-  { id: "autonomous", label: "autonomous", blurb: "Runs budgeted BD loops" },
+  { id: "autonomous", label: "autonomous", blurb: "Works on its own within a set budget" },
 ];
 
 export const CHANNELS: { id: Channel; label: string; meta: string }[] = [

@@ -51,14 +51,30 @@ export default async function CrmPage({ searchParams }: { searchParams: SP }) {
           <VeridianMark size={18} />
           <span className="veridian-tag">veridian</span>
         </div>
-        <div className="eyebrow">network · on-device</div>
-        <h1>CRM</h1>
+        <div className="eyebrow">People</div>
+        <h1>Everyone Tidepath works with, in one place</h1>
         <p className="sub" style={{ marginTop: 8 }}>
-          manage BD for events and your scene. contacts stay in your browser — export anytime.{" "}
-          <a className="inline-link" href={sceneQs ? `/?${sceneQs}` : "/"}>
-            ← dashboard
-          </a>
+          Donors, families, volunteers and partners. Nobody gets typed in twice: say something about a person on the desk and their record updates.
         </p>
+      </FadeIn>
+
+      <FadeIn delay={0.03}>
+        <div className="vh-grid" style={{ marginTop: 20 }}>
+          {[
+            { who: "Donors", what: "María and Maria González were two records. Now one, with every gift counted once.", href: "/desk?tour=2", cta: "See the donor list" },
+            { who: "Families", what: "The Jean-Baptiste household prefers Creole and evening calls. It's on Marisol's call list.", href: "/desk?tour=1", cta: "See this week's calls" },
+            { who: "Volunteers", what: "When a driver is needed today, the volunteer who already drives that area is asked first.", href: "/desk?tour=5", cta: "See open shifts" },
+            { who: "Private notes", what: "Counseling notes stay with the counselor. Funders only see that a session happened.", href: "/desk?tour=4", cta: "See how it stays private" },
+          ].map((c) => (
+            <a key={c.who} className="vh-card" href={c.href}>
+              <div className="vh-who"><strong>{c.who}</strong></div>
+              <div className="vh-gets">{c.what}</div>
+              <div style={{ marginTop: 8, fontSize: 14, fontWeight: 600, color: "#6335BE" }}>{c.cta} →</div>
+            </a>
+          ))}
+        </div>
+        <h2 className="vh-title" style={{ marginTop: 28 }}>Your own contacts</h2>
+        <p className="sub">Add anyone else you want to keep track of. They stay in this browser only.</p>
       </FadeIn>
 
       <FadeIn delay={0.06}>

@@ -9,12 +9,12 @@ import { VeridianProvider } from "@/components/VeridianContext";
 export const viewport = { themeColor: "#F8F0FE", colorScheme: "light" as const };
 
 export const metadata = {
-  title: "agentscene",
-  description: "your scene, your agents — events, people, and AI debriefs from the people you follow.",
+  title: "Veridian Desk · say it once",
+  description: "Say it once, by voice or text. The desk files it, tells the right person the same day, and keeps private things private.",
   openGraph: {
-    title: "agentscene",
-    description: "your scene, your agents — events, people, and AI debriefs from the people you follow.",
-    siteName: "agentscene",
+    title: "Veridian Desk · say it once",
+    description: "Say it once, by voice or text. The desk files it, tells the right person the same day, and keeps private things private.",
+    siteName: "Veridian Desk",
     type: "website",
   },
 };
