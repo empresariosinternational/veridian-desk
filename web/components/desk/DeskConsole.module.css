@@ -552,3 +552,15 @@
   .boardFront::before, .list > li, .feed > li { animation: none; }
 }
 .others { align-items: start; }
+
+/* Stage view (/desk/stage): one column, sample lines as a swipeable row on top, the filed board big below */
+.stage .grid { grid-template-columns: minmax(0, 1fr); }
+.stage .grid > aside { position: static; }
+.stage .scriptList {
+  display: flex; flex-direction: row; gap: 10px; overflow-x: auto;
+  scroll-snap-type: x mandatory; padding-bottom: 6px;
+}
+.stage .scriptList > .label, .stage .scriptList > .hint { display: none; }
+.stage .scriptList > .scriptBtn { flex: 0 0 260px; scroll-snap-align: start; }
+.stage .frontName { font-size: var(--text-h1); }
+.stage .boardFront { padding: var(--sp-6); }

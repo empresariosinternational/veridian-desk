@@ -55,7 +55,7 @@ function saveLocal(state: unknown): void {
   }
 }
 
-export default function DeskConsole() {
+export default function DeskConsole({ stage = false }: { stage?: boolean } = {}) {
   const [data, setData] = useState<DeskPayload | null>(null);
   const [offline, setOffline] = useState(false);
   const [active, setActive] = useState<ProfileId>("marisol");
@@ -473,7 +473,7 @@ export default function DeskConsole() {
   const ctx: BoardCtx = { data, active, hot, hotBoards, funder, funderOn, setFunderOn, busy, act };
 
   return (
-    <div className={css.console}>
+    <div className={`${css.console} ${stage ? css.stage : ""}`}>
       <header className={css.head}>
         <div className={css.brand}>
           <VeridianMark size={30} />
@@ -490,11 +490,11 @@ export default function DeskConsole() {
       <ol style={{ display: "flex", flexWrap: "wrap", gap: 10, listStyle: "none", padding: 0, margin: "4px 0 14px" }} aria-label="How to use the desk">
         {[
           ["1", "Pick who you are", "tap a name below"],
-          ["2", "Tap a line, or hold to talk", "left side · English or Spanish"],
-          ["3", "Watch it get filed", "the board on the right lights up"],
+          ["2", "Tap a line, or hold to talk", stage ? "the row below · English or Spanish" : "left side · English or Spanish"],
+          ["3", "Watch it get filed", stage ? "the big board below lights up" : "the board on the right lights up"],
         ].map(([n, t, d]) => (
-          <li key={n} style={{ flex: "1 1 200px", display: "flex", gap: 10, alignItems: "center", padding: "10px 14px", borderRadius: 14, background: "rgba(99,53,190,0.08)" }}>
-            <span style={{ width: 26, height: 26, flexShrink: 0, borderRadius: 999, background: "#6335BE", color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 13 }}>{n}</span>
+          <li key={n} style={{ flex: "1 1 200px", display: "flex", gap: 10, alignItems: "center", padding: "10px 14px", borderRadius: 14, background: "var(--veridian-soft)" }}>
+            <span style={{ width: 26, height: 26, flexShrink: 0, borderRadius: 999, background: "var(--veridian)", color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 13 }}>{n}</span>
             <span style={{ display: "flex", flexDirection: "column", lineHeight: 1.3 }}><strong style={{ fontSize: 14 }}>{t}</strong><span style={{ fontSize: 13, opacity: 0.75 }}>{d}</span></span>
           </li>
         ))}
@@ -524,7 +524,7 @@ export default function DeskConsole() {
       <div className={css.grid}>
         <aside className={`${css.panel} ${css.sticky}`} aria-label="desk node">
           <div className={css.scriptList}>
-            <span className={css.label} style={{ fontSize: 13, color: "#6335BE" }}>① Start here · tap a line</span>
+            <span className={css.label} style={{ fontSize: 13, color: "var(--veridian-bright)" }}>① Start here · tap a line</span>
             <p className={css.hint} style={{ margin: "0 0 4px" }}>Each line runs through the same pipeline as the microphone. Watch the right side light up where it got filed.</p>
             {SCRIPT.map((l, idx) => (
               <button
@@ -585,7 +585,7 @@ export default function DeskConsole() {
           )}
 
           <div className={css.scriptList} style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid rgba(99,53,190,0.15)" }}>
-            <span className={css.label} style={{ fontSize: 13, color: "#6335BE" }}>② Or say it yourself</span>
+            <span className={css.label} style={{ fontSize: 13, color: "var(--veridian-bright)" }}>② Or say it yourself</span>
           <div className={css.row}>
             <button type="button" className={`${css.btn} ${css.btnArm}`} onClick={() => { primeSpokenAudio(); void nodeEvent("arm"); }} disabled={working || voiceBusy}>
               Start listening
