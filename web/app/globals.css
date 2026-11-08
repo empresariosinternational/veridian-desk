@@ -1920,12 +1920,15 @@ main {
   font-weight: var(--w-medium);
 }
 .profile-dropdown a:hover { background: var(--veridian-soft); }
+.profile-dropdown a span { min-width: 0; }
 .profile-dropdown a em {
+  flex-shrink: 0;
   font-style: normal;
   font-size: 10px;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--text-tertiary);
+  white-space: nowrap;
 }
 
 /* Home feature strip */
@@ -2431,14 +2434,14 @@ a.ss-card:hover {
 
 .os-shell { display: grid; grid-template-columns: var(--os-side) minmax(0, 1fr); min-height: 100vh; }
 .os-sidebar {
-  position: sticky; top: 0; height: 100vh; overflow-y: auto; box-sizing: border-box; z-index: 30;
+  position: sticky; top: 0; height: 100vh; overflow: visible; box-sizing: border-box; z-index: 30;
   display: flex; flex-direction: column; gap: 6px; padding: 18px 14px 16px;
   border-right: 1px solid var(--border); background: var(--page-bg-2);
 }
 .os-brand { display: flex; align-items: center; gap: 10px; padding: 6px 8px 18px 10px; color: var(--text-primary); }
 .os-brand-word { font-weight: 800; font-size: 17px; letter-spacing: -0.04em; }
 .os-brand-tag { margin-left: auto; font-size: 10px; font-weight: var(--w-semibold); letter-spacing: .1em; text-transform: uppercase; white-space: nowrap; color: var(--veridian-bright); }
-.os-nav { display: flex; flex-direction: column; gap: 2px; }
+.os-nav { display: flex; flex-direction: column; gap: 2px; flex: 1; min-height: 0; overflow-y: auto; }
 .os-nav a {
   display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 0 12px; border-radius: var(--r-md);
   color: var(--text-secondary); font-size: 14px; font-weight: var(--w-medium);
@@ -2454,7 +2457,16 @@ a.ss-card:hover {
 .os-sidebar-foot { margin-top: auto; display: flex; flex-direction: column; gap: 10px; padding-top: 16px; }
 .os-sidebar .profile-menu { z-index: 40; }
 .os-sidebar .profile-tab { width: 100%; box-sizing: border-box; }
-.os-sidebar .profile-dropdown { top: auto; bottom: calc(100% + 8px); left: 0; right: auto; }
+.os-sidebar .profile-dropdown {
+  top: auto;
+  bottom: calc(100% + 8px);
+  left: 0;
+  right: auto;
+  width: min(320px, calc(100vw - 28px));
+  max-height: min(70vh, 480px);
+  overflow-y: auto;
+  z-index: 80;
+}
 
 .os-node-card { display: flex; flex-direction: column; gap: 6px; padding: 14px; border: 1px solid var(--border); border-radius: var(--r-lg); }
 .os-node-line { display: flex; align-items: center; gap: 8px; min-height: 24px; font-size: 13px; font-weight: var(--w-semibold); color: var(--text-primary); }
