@@ -521,7 +521,7 @@ export default function DeskConsole() {
           <div className={css.scriptList}>
             <span className={css.label} style={{ fontSize: 13, color: "#6335BE" }}>① Start here · tap a line</span>
             <p className={css.hint} style={{ margin: "0 0 4px" }}>Each line runs through the same pipeline as the microphone. Watch the right side light up where it got filed.</p>
-            {SCRIPT.map((l) => (
+            {SCRIPT.map((l, idx) => (
               <button
                 key={l.id}
                 type="button"
@@ -529,7 +529,7 @@ export default function DeskConsole() {
                 disabled={busy === "hear" || voiceBusy}
                 onClick={() => runLine(l.id)}
               >
-                <span className={css.stepNum}>{l.step}</span>
+                <span className={css.stepNum}>{idx + 1}</span>
                 <span>
                   <strong>
                     {l.label}
