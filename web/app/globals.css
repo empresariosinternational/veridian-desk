@@ -1871,15 +1871,29 @@ main {
   text-overflow: ellipsis;
 }
 .profile-tab-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: stretch;
   border: none;
   border-left: 1px solid rgba(124, 77, 216, 0.35);
   background: transparent;
   color: var(--veridian-bright);
-  padding: 0 10px;
+  padding: 0 12px;
   cursor: pointer;
-  font-size: 12px;
 }
+.profile-tab-chevron-icon {
+  width: 14px;
+  height: 14px;
+  display: block;
+  transition: transform 160ms var(--ease);
+}
+.profile-tab-chevron[aria-expanded="true"] .profile-tab-chevron-icon { transform: rotate(180deg); }
 .profile-tab-chevron:hover { background: rgba(124, 77, 216, 0.18); }
+.profile-tab-chevron:focus-visible {
+  outline: 2px solid var(--veridian-bright);
+  outline-offset: -3px;
+}
 .profile-dropdown {
   position: absolute;
   right: 0;
@@ -2460,7 +2474,21 @@ a.ss-card:hover {
 .os-sidebar-ask .vcta { width: 100%; min-height: 44px; }
 .os-sidebar-foot { margin-top: auto; display: flex; flex-direction: column; gap: 10px; padding-top: 16px; }
 .os-sidebar .profile-menu { z-index: 40; }
-.os-sidebar .profile-tab { width: 100%; box-sizing: border-box; }
+.os-sidebar .profile-tab { width: 100%; min-height: 52px; box-sizing: border-box; }
+.os-sidebar .profile-tab-main { flex: 0 1 auto; min-width: 0; padding: 6px 12px 6px 6px; }
+.os-sidebar .profile-tab-avatar { width: 34px; height: 34px; font-size: 14px; }
+.os-sidebar .profile-tab-chevron {
+  flex: 1 1 auto;
+  min-width: 96px;
+  padding: 0;
+  border-left: 0;
+  background: var(--veridian);
+  color: var(--on-accent);
+}
+.os-sidebar .profile-tab-chevron:hover,
+.os-sidebar .profile-tab-chevron[aria-expanded="true"] { background: var(--veridian-bright); }
+.os-sidebar .profile-tab-chevron:focus-visible { outline-color: #fff; }
+.os-sidebar .profile-tab-chevron-icon { width: 22px; height: 22px; }
 .os-sidebar .profile-dropdown {
   top: auto;
   bottom: calc(100% + 8px);
