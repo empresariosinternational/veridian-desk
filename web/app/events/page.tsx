@@ -1,88 +1,69 @@
 import Link from "next/link";
-import { buildDigestCached } from "@/lib/luma";
-import { getServerSessionKey } from "@/lib/luma-session";
-import { parseParams } from "@/lib/defaults";
-import EventTimeline from "@/components/EventTimeline";
-import CalendarCard from "@/components/CalendarCard";
 import FadeIn from "@/components/motion/FadeIn";
-import { fmtDay, giveMiamiDay, todayISO } from "@/lib/desk/time";
+import { addDays, endOfWorkWeek, fmtDay, giveMiamiDay, nextWeekday, todayISO, daysBetween } from "@/lib/desk/time";
 
-export const revalidate = 1800;
+export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Events · agentscene",
-  description: "Community dates and what the people you follow are throwing.",
+  title: "Events · Veridian Desk",
+  description: "Tidepath's dates that matter: workshops, donor days, report deadlines and volunteer shifts.",
 };
 
-type SP = Promise<Record<string, string | undefined>>;
+type Item = { date: string; title: string; who: string; desk: string; step: number };
 
-export default async function EventsPage({ searchParams }: { searchParams: SP }) {
-  const spRaw = await searchParams;
-  const sp: Record<string, string | undefined> = {};
-  for (const [k, v] of Object.entries(spRaw)) sp[k] = Array.isArray(v) ? (v as any)[0] : (v as any);
+function when(today: string, date: string): string {
+  const d = daysBetween(today, date);
+  return d === 0 ? "today" : d === 1 ? "tomorrow" : `in ${d} days`;
+}
 
-  const { cities, follows, aliases } = parseParams(sp);
-  const sessionKey = await getServerSessionKey();
-  const data = await buildDigestCached({ cities, follows, cityAliases: aliases, sessionKey });
-  const sceneQs = new URLSearchParams({
-    ...(sp.cities ? { cities: sp.cities } : {}),
-    ...(sp.follows ? { follows: sp.follows } : {}),
-  }).toString();
-
-  const upcoming = [...Object.values(data.groups).flat(), ...data.elsewhere]
-    .filter((e) => e.start)
-    .sort((a, b) => (a.start! < b.start! ? -1 : 1))
-    .slice(0, 24);
-  const gmd = giveMiamiDay(todayISO());
-  const gmdMonth = new Intl.DateTimeFormat("en-US", { month: "short", timeZone: "UTC" }).format(new Date(`${gmd.date}T12:00:00Z`)).toUpperCase();
-  const gmdDay = Number(gmd.date.slice(8, 10));
+export default function EventsPage() {
+  const today = todayISO();
+  const gmd = giveMiamiDay(today);
+  const items: Item[] = [
+    { date: nextWeekday(today, 4), title: "Workshop at Edison Elementary, in Spanish", who: "Yesenia · front desk", desk: "Becomes a workshop card with a room, a Spanish-speaking facilitator and a parent flyer, each with an owner.", step: 3 },
+    { date: endOfWorkWeek(today), title: "Missed-mentoring calls due", who: "Marisol · programs", desk: "Every family who missed a session is on her call list, and the count goes straight into the quarterly report.", step: 1 },
+    { date: nextWeekday(today, 6), title: "Saturday volunteer driving shifts", who: "Owen · volunteers", desk: "Say “we need a driver” and the shift goes only to volunteers who drive in that neighborhood.", step: 5 },
+    { date: gmd.date, title: "Give Miami Day", who: "Denise · fundraising", desk: "Lapsed donors get a call list ahead of the day, with duplicates merged so no one is asked twice.", step: 2 },
+    { date: addDays(gmd.date, 12), title: "County youth safety grant: quarterly update due", who: "Claudette · director", desk: "The desk drafts the update using only numbers it can trace to a real record, and leaves counseling notes out.", step: 6 },
+  ]
+    .filter((i) => daysBetween(today, i.date) >= 0)
+    .sort((a, b) => (a.date < b.date ? -1 : 1));
 
   return (
     <>
       <FadeIn>
         <div className="eyebrow">Events</div>
-        <h1>What is coming up</h1>
-        <p className="sub" style={{ marginTop: 8 }}>
-          Tidepath’s big dates first, then other events around Miami. When a date needs helpers, Veridian lines them up for you.
+        <h1>What is coming up at Tidepath</h1>
+        <p className="sub" style={{ marginTop: 8, maxWidth: 680 }}>
+          The dates the team is working toward. Tap any one to watch the desk handle it.
         </p>
       </FadeIn>
 
-      <div className="dash-grid">
-        <div className="dash-main">
-          {gmd.daysAway >= 0 && (
-            <FadeIn delay={0.04}>
-              <section className="os-event-feature" aria-label="Give Miami Day">
-                <div className="os-date-tile os-date-tile-lg"><span>{gmdMonth}</span><strong>{gmdDay}</strong></div>
-                <div>
-                  <h2>Give Miami Day</h2>
-                  <p>{fmtDay(gmd.date)} · {gmd.daysAway === 0 ? "today" : gmd.daysAway === 1 ? "tomorrow" : `${gmd.daysAway} days away`}. Event helpers and thank-yous run through Today and the desk.</p>
-                  <div className="os-move-actions">
-                    <Link href={`/${sceneQs ? `?${sceneQs}` : ""}`} prefetch={false} className="os-btn">Line up helpers</Link>
-                    <Link href="/desk" prefetch={false} className="os-btn-ghost">Open the desk</Link>
+      <FadeIn delay={0.04}>
+        <ol style={{ listStyle: "none", padding: 0, margin: "20px 0 0", display: "flex", flexDirection: "column", gap: 12, maxWidth: 820 }}>
+          {items.map((i) => {
+            const d = new Date(`${i.date}T12:00:00Z`);
+            const mon = new Intl.DateTimeFormat("en-US", { month: "short", timeZone: "UTC" }).format(d).toUpperCase();
+            return (
+              <li key={i.title}>
+                <Link
+                  href={`/desk?tour=${i.step}`}
+                  prefetch={false}
+                  style={{ display: "flex", gap: 16, alignItems: "flex-start", padding: "16px 18px", borderRadius: 16, background: "rgba(99,53,190,0.07)", border: "1px solid rgba(99,53,190,0.14)", textDecoration: "none", color: "inherit" }}
+                >
+                  <div className="os-date-tile" style={{ flexShrink: 0 }}><span>{mon}</span><strong>{Number(i.date.slice(8, 10))}</strong></div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, opacity: 0.7 }}>{fmtDay(i.date)} · {when(today, i.date)} · {i.who}</div>
+                    <h2 style={{ fontSize: 18, margin: "2px 0 6px", lineHeight: 1.3, textTransform: "none", letterSpacing: 0 }}>{i.title}</h2>
+                    <p style={{ margin: 0, fontSize: 15, lineHeight: 1.45, opacity: 0.85 }}>{i.desk}</p>
+                    <span style={{ display: "inline-block", marginTop: 8, fontSize: 14, fontWeight: 600, color: "#6335BE" }}>Watch the desk do it →</span>
                   </div>
-                </div>
-              </section>
-            </FadeIn>
-          )}
-
-          <FadeIn delay={0.06}>
-            <h2 className="dash-section-title">Other events around Miami</h2>
-            {upcoming.length > 0 ? (
-              <EventTimeline events={upcoming} people={data.people} />
-            ) : (
-              <p className="sub">
-                Nothing on the calendar yet. <Link href="/setup#scene">Add a zip or a host</Link> to fill it.
-              </p>
-            )}
-          </FadeIn>
-        </div>
-
-        <aside className="dash-rail" aria-label="calendar">
-          <FadeIn delay={0.08}>
-            <CalendarCard sceneQs={sceneQs} />
-          </FadeIn>
-        </aside>
-      </div>
+                </Link>
+              </li>
+            );
+          })}
+        </ol>
+      </FadeIn>
     </>
   );
 }
