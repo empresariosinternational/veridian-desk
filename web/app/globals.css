@@ -2487,7 +2487,8 @@ a.ss-card:hover {
 }
 .os-sidebar .profile-tab-chevron:hover,
 .os-sidebar .profile-tab-chevron[aria-expanded="true"] { background: var(--veridian-bright); }
-.os-sidebar .profile-tab-chevron:focus-visible { outline-color: #fff; }
+/* Aubergine ring: 14:1 on the canvas, so keyboard focus stays visible on lavender. */
+.os-sidebar .profile-tab-chevron:focus-visible { outline-color: var(--text-primary); }
 .os-sidebar .profile-tab-chevron-icon { width: 22px; height: 22px; }
 .os-sidebar .profile-dropdown {
   top: auto;

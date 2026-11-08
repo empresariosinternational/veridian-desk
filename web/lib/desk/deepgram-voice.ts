@@ -90,20 +90,69 @@ export class SpeakFailure extends Error {
   }
 }
 
-export function speakStreamUrl(lang: Lang): string {
+/** English Aura-2 voices allowed as a per-request override, for listening tests. */
+export const LISTEN_VOICES = [
+  "aura-2-vesta-en",
+  "aura-2-thalia-en",
+  "aura-2-andromeda-en",
+  "aura-2-helena-en",
+  "aura-2-luna-en",
+  "aura-2-minerva-en",
+  "aura-2-apollo-en",
+  "aura-2-arcas-en",
+] as const;
+export type ListenVoice = (typeof LISTEN_VOICES)[number];
+export type SpeakOptions = { model?: ListenVoice; speed?: number };
+
+/** Deepgram accepts 0.7-1.5 in 0.05 steps. Overrides stay in 0.9-1.3. */
+export function validSpeed(speed: number): boolean {
+  return Number.isFinite(speed) && speed >= 0.9 && speed <= 1.3 && Math.abs(speed * 20 - Math.round(speed * 20)) < 1e-6;
+}
+
+export function speakStreamUrl(lang: Lang, options: SpeakOptions = {}): string {
   const voice = voiceFor(lang);
+  const model = lang !== "es" && options.model ? options.model : voice.model;
+  const speed = options.speed !== undefined && validSpeed(options.speed) ? Math.round(options.speed * 20) / 20 : SPEAK_SPEED;
   const url = new URL("wss://api.deepgram.com/v1/speak");
-  url.searchParams.set("model", voice.model);
+  url.searchParams.set("model", model);
   url.searchParams.set("encoding", "linear16");
   url.searchParams.set("sample_rate", String(SPEAK_SAMPLE_RATE));
-  url.searchParams.set("speed", String(SPEAK_SPEED));
+  url.searchParams.set("speed", String(speed));
   return url.toString();
+}
+
+/**
+ * Aura-2 takes its pacing from the text: every line break, bullet, symbol and
+ * ellipsis becomes a pause. Chat replies arrive as markdown, so speak them as
+ * plain sentences.
+ */
+export function speechText(text: string): string {
+  return text
+    .replace(/```[\s\S]*?```/g, " ")
+    .replace(/`([^`]*)`/g, "$1")
+    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/https?:\/\/\S+/g, " ")
+    .replace(/\*\*|__/g, "")
+    .replace(/(^|[\s(])\*(?=\S)([^*\n]*?\S)\*(?=[\s).,!?;:]|$)/g, "$1$2")
+    .replace(/^[ \t]{0,3}#{1,6}[ \t]+/gm, "")
+    .replace(/^[ \t]*(?:[-*\u2022\u2013]|\d{1,2}[.)])[ \t]+/gm, "")
+    .replace(/[ \t]*[\u00b7\u2022|][ \t]*/g, ", ")
+    .replace(/[ \t]*(?:\u2192|->|\u21d2)[ \t]*/g, " to ")
+    .replace(/[ \t]+[\u2014\u2013][ \t]+|\u2014/g, ", ")
+    .replace(/\p{Extended_Pictographic}\uFE0F?/gu, "")
+    .replace(/\u2026|\.{2,}/g, ".")
+    .replace(/([^\s.!?,;:])[ \t]*\n+\s*/g, "$1. ")
+    .replace(/\s*\n+\s*/g, " ")
+    .replace(/[ \t]+([,.!?;:])/g, "$1")
+    .replace(/([,;:])(?:[ \t]*[,;:])+/g, "$1")
+    .replace(/[ \t]{2,}/g, " ")
+    .trim();
 }
 
 /** One Speak and one Flush. Splitting the line makes Aura lengthen each ending. */
 export function speakMessages(text: string): string[] {
   return [
-    JSON.stringify({ type: "Speak", text: text.trim() }),
+    JSON.stringify({ type: "Speak", text: speechText(text) }),
     JSON.stringify({ type: "Flush" }),
   ];
 }
@@ -209,9 +258,9 @@ async function waitUntilOpen(socket: WebSocket): Promise<void> {
 }
 
 /** Stream Aura-2 audio. The first chunk is available before the rest of the line is synthesized. */
-export async function spokenAudio(text: string, lang: Lang, key: string): Promise<ReadableStream<Uint8Array>> {
+export async function spokenAudio(text: string, lang: Lang, key: string, options: SpeakOptions = {}): Promise<ReadableStream<Uint8Array>> {
   const messages = speakMessages(text);
-  const socket = createSpeakSocket(speakStreamUrl(lang), key);
+  const socket = createSpeakSocket(speakStreamUrl(lang, options), key);
   try {
     await waitUntilOpen(socket);
   } catch (error) {
