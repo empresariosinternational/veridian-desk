@@ -18,10 +18,10 @@ npm run dev                    # open localhost:3000/desk for browser hardware A
 
 Before you go on:
 
-1. The header pill should say **Deepgram · Vesta & Selena**. Allow microphone access in a browser with speech recognition. `DEEPGRAM_API_KEY` must be set on the server. GPT is optional: without its key, desk-rule filing still works.
+1. The header pill should say **Deepgram · Thalia & Selena**. Allow microphone access in a browser with speech recognition. `DEEPGRAM_API_KEY` must be set on the server. GPT is optional: without its key, desk-rule filing still works.
 2. Do one live test so the browser asks for the microphone now, not on stage: **Arm**, hold **Hold to talk**, say “This is Ana. Testing the desk.”, release, and listen for the spoken confirmation.
 3. Press **Reset demo** twice (the second click confirms). The desk is back to the seed.
-4. Laptop volume up. Deepgram speaks the confirmation in Vesta (English) or Selena (Spanish).
+4. Laptop volume up. Deepgram speaks the confirmation in Thalia (English) or Selena (Spanish).
 
 Every line below has a button in the left panel. The buttons send the exact text through the same pipeline as the mic (`POST /api/desk/hear`), so a loud room cannot kill the demo. Speak a line live when the room is quiet. Use the button when it is not.
 

@@ -4,7 +4,7 @@
 
 **Say it once. The desk files it, routes the urgent thing the same day, and keeps private things private.**
 
-Veridian Desk is an assistant for nonprofits, communities, and the people in them. Chat with the desk, plan the day's executive tasks, or say a fact once and file it. The browser handles microphone speech recognition. Spoken replies use Deepgram Aura-2: Vesta in English and Selena in Spanish. OpenAI optionally powers GPT chat and planning. The desk merges duplicate donors, turns workshop requests into approval checklists, keeps counseling detail out of funder reports, and drafts grant updates from a truth ledger. The same network staffs shifts and proposes public needs for both communities to approve.
+Veridian Desk is an assistant for nonprofits, communities, and the people in them. Chat with the desk, plan the day's executive tasks, or say a fact once and file it. The browser handles microphone speech recognition. Spoken replies use Deepgram Aura-2: Thalia in English and Selena in Spanish. OpenAI optionally powers GPT chat and planning. The desk merges duplicate donors, turns workshop requests into approval checklists, keeps counseling detail out of funder reports, and drafts grant updates from a truth ledger. The same network staffs shifts and proposes public needs for both communities to approve.
 
 Built at the DevDay Exchange · Codex Hackathon for Miami's Non-Profits (The LAB Miami, Nov 7–8, 2026) for the six Tidepath Family Alliance challenges and the Mangrove Mews bonus. Veridian is the assistant layer; the web app around it is Agentscene. All people, organizations, schools, donors and amounts in the demo are fictional.
 
@@ -19,13 +19,13 @@ npm run desk:test              # OpenAI integration tests using a local API fixt
 npm run veridian:test          # VCTA chat, task commands, and task validation
 ```
 
-Desk-rule filing needs no key. Spoken replies need a server-side `DEEPGRAM_API_KEY`. Open `/desk`, allow microphone access, press **Arm**, then hold **Hold to talk** and release to file. Choose English or Español with **Spoken language**. A browser with Web Speech recognition is required; unsupported browsers can use typed notes and demo buttons. The header pill reads **Deepgram · Vesta & Selena** when the key is set.
+Desk-rule filing needs no key. Spoken replies need a server-side `DEEPGRAM_API_KEY`. Open `/desk`, allow microphone access, press **Arm**, then hold **Hold to talk** and release to file. Choose English or Español with **Spoken language**. A browser with Web Speech recognition is required; unsupported browsers can use typed notes and demo buttons. The header pill reads **Deepgram · Thalia & Selena** when the key is set.
 
 For GPT chat and executive planning, optionally set the server-side `OPENAI_API_KEY` in your shell, `web/.env.local`, or the Vercel project environment. Keep the Vercel project root at `web/`. No browser key or `NEXT_PUBLIC_` key is needed. Redeploy after changing hosted environment variables.
 
 Open `/desk` and select a profile. **Chat** supports follow-up questions with a separate conversation per profile. **Plan my day** proposes prioritized tasks with owners, dates, and approval requirements from current desk work. **File a note** updates boards through validated tools. Chat and planning do not file notes or execute proposed tasks; existing approval controls handle offers, workshops, and network matches.
 
-The only model setting is the optional `OPENAI_MODEL=gpt-4.1-mini` override in `web/.env.example`. The GPT model must support the Responses API and Structured Outputs. Spoken replies use Deepgram Aura-2 (`aura-2-vesta-en` and `aura-2-selena-es`). The key stays on the server.
+The only model setting is the optional `OPENAI_MODEL=gpt-4.1-mini` override in `web/.env.example`. The GPT model must support the Responses API and Structured Outputs. Spoken replies use Deepgram Aura-2 (`aura-2-thalia-en` and `aura-2-selena-es`). The key stays on the server.
 
 No OpenAI key or an upstream outage? Filing uses the desk rules. GPT chat and planning on `/desk` show an error without creating records. The VCTA also supports direct task commands without GPT. If Deepgram cannot speak, the filed work stays intact and the written confirmation stays on screen.
 

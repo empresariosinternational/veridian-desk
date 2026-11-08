@@ -1,7 +1,7 @@
 /** Aura-2 paces from the text. Markdown and symbols must reach it as plain sentences. */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { LISTEN_VOICES, speakMessages, speakStreamUrl, speechText, validSpeed } from "../lib/desk/deepgram-voice";
+import { SPEAK_SPEED, speakMessages, speakStreamUrl, speechText } from "../lib/desk/deepgram-voice";
 
 test("plain confirmations pass through unchanged", () => {
   for (const line of ["Filed once. Jordan's mom is on this week's call list.", "Ya está anotado.", "Call Maria before Give Miami Day."]) {
@@ -34,13 +34,12 @@ test("the Speak message carries the cleaned line", () => {
   assert.equal(speak.text, "Filed once. Nothing doubled");
 });
 
-test("voice and speed overrides are allowlisted", () => {
-  assert.ok(validSpeed(1) && validSpeed(1.1) && validSpeed(0.9) && validSpeed(1.3));
-  assert.ok(!validSpeed(1.12) && !validSpeed(0.85) && !validSpeed(1.35) && !validSpeed(Number.NaN));
-  const url = new URL(speakStreamUrl("en", { model: "aura-2-thalia-en", speed: 1.1 }));
-  assert.equal(url.searchParams.get("model"), "aura-2-thalia-en");
-  assert.equal(url.searchParams.get("speed"), "1.1");
-  const spanish = new URL(speakStreamUrl("es", { model: "aura-2-thalia-en" }));
+test("English speaks at Thalia's natural pace; Spanish keeps 1.15", () => {
+  const english = new URL(speakStreamUrl("en"));
+  assert.equal(english.searchParams.get("model"), "aura-2-thalia-en");
+  assert.equal(english.searchParams.has("speed"), false);
+  assert.equal(SPEAK_SPEED.en, 1);
+  const spanish = new URL(speakStreamUrl("es"));
   assert.equal(spanish.searchParams.get("model"), "aura-2-selena-es");
-  assert.ok(LISTEN_VOICES.every((v) => /^aura-2-[a-z]+-en$/.test(v)));
+  assert.equal(spanish.searchParams.get("speed"), "1.15");
 });

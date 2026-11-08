@@ -22,11 +22,11 @@ test("English and Spanish use Aura-2 people with a human personality", () => {
   const spanish = voiceFor("es");
   const creole = voiceFor("ht");
   for (const voice of [english, spanish, creole]) assertHumanVoice(voice);
-  assert.equal(english.model, "aura-2-vesta-en");
+  assert.equal(english.model, "aura-2-thalia-en");
   assert.equal(spanish.model, "aura-2-selena-es");
   assert.equal(spanish.accent, "Latin American");
   assert.equal(creole.model, english.model);
-  assert.ok(english.personality.includes("Empathetic"));
+  assert.ok(english.personality.includes("Energetic"));
   assert.ok(spanish.personality.includes("Friendly"));
   assert.equal(english.provider, "deepgram");
 });
@@ -117,7 +117,7 @@ test("speak route streams the first audio chunk and does not leak the key", asyn
   assert.equal(response.status, 200);
   assert.equal(response.headers.get("content-type"), "audio/l16; rate=24000; channels=1");
   assert.equal(response.headers.get("x-audio-sample-rate"), "24000");
-  assert.equal(response.headers.get("x-veridian-voice"), "aura-2-vesta-en");
+  assert.equal(response.headers.get("x-veridian-voice"), "aura-2-thalia-en");
   const reader = response.body!.getReader();
   const first = await reader.read();
   assert.deepEqual(Array.from(first.value ?? new Uint8Array()), [1, 2, 3, 4]);
@@ -127,10 +127,10 @@ test("speak route streams the first audio chunk and does not leak the key", asyn
   const opened = FakeSocket.latest;
   assert.ok(opened);
   const url = new URL(opened.url);
-  assert.equal(url.searchParams.get("model"), "aura-2-vesta-en");
+  assert.equal(url.searchParams.get("model"), "aura-2-thalia-en");
   assert.equal(url.searchParams.get("encoding"), "linear16");
   assert.equal(url.searchParams.get("sample_rate"), "24000");
-  assert.equal(url.searchParams.get("speed"), "1.15");
+  assert.equal(url.searchParams.has("speed"), false);
   assert.equal(opened.url.includes("test-key-not-real"), false);
   assert.equal(opened.options?.headers?.Authorization, "Token test-key-not-real");
   assert.deepEqual(opened.sent.map((message) => JSON.parse(message) as { type: string; text?: string }), [
