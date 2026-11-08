@@ -92,6 +92,8 @@ let audioContext: AudioContext | null = null;
 let sources: AudioBufferSourceNode[] = [];
 let nextAt = 0;
 let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
+let voiceNode: AudioWorkletNode | null = null;
+let voiceModule: Promise<void> | null = null;
 
 function audioContextConstructor(): (new (options?: AudioContextOptions) => AudioContext) | null {
   if (typeof window === "undefined") return null;
@@ -105,10 +107,39 @@ export function canPlaySpoken(): boolean {
 
 /** Call from the click or key that leads to a reply so the first chunk can play immediately. */
 export function primeSpokenAudio(): void {
+  const ctx = spokenContext();
+  if (!ctx) return;
+  if (ctx.state === "suspended") void ctx.resume();
+  if (ctx.audioWorklet && !voiceModule) {
+    voiceModule = ctx.audioWorklet.addModule("/desk-voice-processor.js").catch(() => {
+      voiceModule = null;
+    });
+  }
+}
+
+function spokenContext(): AudioContext | null {
   const Context = audioContextConstructor();
-  if (!Context) return;
+  if (!Context) return null;
   if (!audioContext) audioContext = new Context({ latencyHint: "interactive" });
-  if (audioContext.state === "suspended") void audioContext.resume();
+  return audioContext;
+}
+
+async function continuousVoice(ctx: AudioContext): Promise<AudioWorkletNode | null> {
+  if (!ctx.audioWorklet) return null;
+  try {
+    if (!voiceModule) voiceModule = ctx.audioWorklet.addModule("/desk-voice-processor.js");
+    await voiceModule;
+    if (!voiceNode || voiceNode.context !== ctx) {
+      voiceNode?.disconnect();
+      voiceNode = new AudioWorkletNode(ctx, "desk-voice", { processorOptions: { inputRate: SPEAK_SAMPLE_RATE } });
+      voiceNode.connect(ctx.destination);
+    }
+    return voiceNode;
+  } catch {
+    voiceModule = null;
+    voiceNode = null;
+    return null;
+  }
 }
 
 export function cancelSpeech(): void {
@@ -116,6 +147,7 @@ export function cancelSpeech(): void {
   if (typeof window !== "undefined" && "speechSynthesis" in window) window.speechSynthesis.cancel();
   reader?.cancel().catch(() => undefined);
   reader = null;
+  voiceNode?.port.postMessage("clear");
   for (const source of sources) {
     try { source.stop(); } catch { /* Already finished. */ }
   }
@@ -160,6 +192,7 @@ export async function speakWithPersonality(text: string, lang: Lang, onError: ()
       return false;
     }
     const ctx = audioContext;
+    const playerPromise = continuousVoice(ctx);
     const responsePromise = fetch("/api/desk/speak", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -171,6 +204,8 @@ export async function speakWithPersonality(text: string, lang: Lang, onError: ()
     if (!response.ok || !response.body) throw new Error("Deepgram voice unavailable");
     const headerRate = Number(response.headers.get("x-audio-sample-rate"));
     const rate = [8_000, 16_000, 24_000, 32_000, 48_000].includes(headerRate) ? headerRate : SPEAK_SAMPLE_RATE;
+    const player = await playerPromise;
+    if (player && rate !== SPEAK_SAMPLE_RATE) player.port.postMessage({ type: "rate", rate });
     reader = response.body.getReader();
     let pending = new Uint8Array(0);
     while (mine === generation) {
@@ -181,7 +216,8 @@ export async function speakWithPersonality(text: string, lang: Lang, onError: ()
       const split = takeSamples(pending, value);
       pending = split.pending;
       if (!split.samples.length) continue;
-      schedule(ctx, split.samples, rate);
+      if (player) player.port.postMessage(split.samples);
+      else schedule(ctx, split.samples, rate);
       started = true;
     }
     if (!started) throw new Error("empty audio");
