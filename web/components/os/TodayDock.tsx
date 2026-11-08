@@ -10,7 +10,7 @@ import { IconMic, IconSend } from "./Icons";
  * Option A's dock on Today: type or hold the mic, and the Veridian panel opens
  * beside the page with the answer (spoken back when you talked).
  */
-export default function TodayDock({ home = false }: { home?: boolean }) {
+export default function TodayDock({ home = false, desk = false }: { home?: boolean; desk?: boolean }) {
   const { ask, open } = useVeridian();
   const [text, setText] = useState("");
   const [lang, setLang] = useState<"en-US" | "es-US">("en-US");
@@ -70,12 +70,14 @@ export default function TodayDock({ home = false }: { home?: boolean }) {
       setNotice(r.error ?? "I didn't hear anything. Hold the mic while you talk.");
       return;
     }
-    ask(r.text, "voice");
+    if (desk) window.dispatchEvent(new CustomEvent("veridian:desk-say", { detail: { text: r.text, source: "voice", lang: lang.startsWith("es") ? "es" : "en" } }));
+    else ask(r.text, "voice");
   };
 
   const send = () => {
     if (!text.trim()) return;
-    ask(text.trim(), "typed");
+    if (desk) window.dispatchEvent(new CustomEvent("veridian:desk-say", { detail: { text: text.trim(), source: "typed", lang: lang.startsWith("es") ? "es" : "en" } }));
+    else ask(text.trim(), "typed");
     setText("");
   };
 
@@ -85,7 +87,7 @@ export default function TodayDock({ home = false }: { home?: boolean }) {
       <form className="os-dock-bar" onSubmit={(e) => { e.preventDefault(); send(); }}>
         <VeridianMark size={18} />
         <label className="vcta-sr-only" htmlFor="os-dock-input">Ask Veridian</label>
-        <input id="os-dock-input" value={text} maxLength={1000} onChange={(e) => setText(e.target.value)} placeholder={listening ? "Listening… let go to send" : "Ask anything, or hold the mic and talk"} disabled={listening} autoComplete="off" />
+        <input id="os-dock-input" value={text} maxLength={1000} onChange={(e) => setText(e.target.value)} placeholder={listening ? "Listening… let go to send" : desk ? "Say one update to file it, or hold the mic and talk" : "Ask anything, or hold the mic and talk"} disabled={listening} autoComplete="off" />
         <button type="button" className="os-dock-lang" onClick={() => setLang(lang === "en-US" ? "es-US" : "en-US")} aria-label={`Voice language: ${lang === "en-US" ? "English" : "Spanish"}. Switch`} disabled={listening}>
           {lang === "en-US" ? "EN" : "ES"}
         </button>

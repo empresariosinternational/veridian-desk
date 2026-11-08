@@ -21,8 +21,9 @@ export const metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
+        <script dangerouslySetInnerHTML={{ __html: `try{var t=localStorage.getItem("veridian-theme");if(t==="dark")document.documentElement.dataset.theme="dark"}catch(e){}` }} />
         <link rel="preconnect" href="https://images.lumacdn.com" crossOrigin="anonymous" />
       </head>
       <body>

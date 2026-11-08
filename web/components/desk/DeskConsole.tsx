@@ -282,9 +282,14 @@ export default function DeskConsole() {
       const id = (e as CustomEvent<{ id: string }>).detail?.id;
       if (id) runLineRef.current(id);
     };
+    const onSay = (e: Event) => {
+      const d = (e as CustomEvent<{ text: string; source: "voice" | "typed"; lang: "en" | "es" }>).detail;
+      if (d?.text) void hearRef.current({ text: d.text, source: d.source === "voice" ? "voice" : "typed", lang: d.lang });
+    };
     window.addEventListener("veridian:tour-run", onRun);
+    window.addEventListener("veridian:desk-say", onSay);
     window.dispatchEvent(new Event("veridian:desk-ready"));
-    return () => window.removeEventListener("veridian:tour-run", onRun);
+    return () => { window.removeEventListener("veridian:tour-run", onRun); window.removeEventListener("veridian:desk-say", onSay); };
   }, [deskReady]);
   const runLineRef = useRef<(id: string) => void>(() => {});
   const runLine = useCallback((id: string) => {
