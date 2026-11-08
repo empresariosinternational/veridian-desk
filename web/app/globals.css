@@ -53,10 +53,11 @@
   --border-dash: rgba(40, 27, 50, 0.30);
   --border-input: rgba(40, 27, 50, 0.50);
 
-  /* Text — deep aubergine, not black (14.6:1 / 6.8:1 / 5.1:1 on the canvas) */
+  /* Text — deep aubergine, not black (14.6:1 / 7.4:1 / 5.8:1 on the canvas).
+     Tertiary stays ≥4.5:1 on the darkest tinted surface (surface-3 over the sidebar). */
   --text-primary: #281B32;
-  --text-secondary: #5C4F66;
-  --text-tertiary: #6E6277;
+  --text-secondary: #574A61;
+  --text-tertiary: #665A6F;
   --text-disabled: #A39AAA;
 
   /* Accent — Miami ocean: fill, and a deeper ink for text and links */
@@ -66,7 +67,7 @@
 
   /* Brand coral, deepened for a light canvas (white text on it is 5.3:1) */
   --brand: #C13C36;
-  --brand-bright: #BA3630;
+  --brand-bright: #B0332D;
 
   /* Veridian — assistant/OS violet. "bright" is the text ink; "light" is the mark's inner facet */
   --veridian: #7C4DD8;
@@ -130,7 +131,7 @@
   --ocean: var(--accent);
   --ocean-soft: var(--accent-bright);
   --flamingo: var(--brand);
-  --sunset: #BA3630;
+  --sunset: var(--brand-bright);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -156,6 +157,9 @@ html, body {
 }
 
 a { color: inherit; text-decoration: none; }
+
+/* Hints read as hints but still pass AA (the browser default gray does not on lavender). */
+::placeholder { color: var(--text-tertiary); opacity: 1; }
 
 main {
   max-width: var(--content-max);
