@@ -13,7 +13,7 @@ type VoiceState = "idle" | "listening" | "ready" | "finishing";
 const LEVELS: Priority[] = ["high", "normal", "low"];
 
 export default function VeridianDock() {
-  const { open, setOpen } = useVeridian();
+  const { open, setOpen, bridge, pending: pendingAsk } = useVeridian();
   const pathname = usePathname();
   const [tasks, setTasks] = useState<Task[]>(loadTasks);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -79,8 +79,9 @@ export default function VeridianDock() {
 
   useEffect(() => {
     if (!open) { cancelCapture(); return; }
-    const header = document.querySelector(".hdr");
-    const position = () => setPanelTop((header?.getBoundingClientRect().bottom ?? 60) + 12);
+    // Desktop has no top bar (the sidebar holds navigation); phones keep a slim one.
+    const header = document.querySelector(".os-topbar");
+    const position = () => setPanelTop(Math.max(0, header?.getBoundingClientRect().bottom ?? 0) + 12);
     position();
     const observer = new ResizeObserver(position);
     if (header) observer.observe(header);
@@ -181,6 +182,25 @@ export default function VeridianDock() {
     if (result.error || !result.text) { setNotice(result.error ?? "I didn't hear anything. Hold to talk, or type your message."); return; }
     await send(result.text, "chat", "voice");
   };
+
+  // Pages reach Veridian through the layout context: Today's dock, next moves, The Pond.
+  useEffect(() => {
+    bridge.current = {
+      submit: (text, source) => { void send(text, "chat", source); },
+      addTasks: (actions) => {
+        try { commit(actions); return true; }
+        catch (error) { setNotice((error as Error).message); return false; }
+      },
+      showTasks: () => setTab("tasks"),
+    };
+  });
+  useEffect(() => {
+    const queued = pendingAsk.current;
+    if (!queued) return;
+    pendingAsk.current = null;
+    void send(queued.text, "chat", queued.source);
+  });
+  useEffect(() => () => { bridge.current = {}; }, [bridge]);
 
   const addSuggestion = (task: Suggestion) => {
     try { commit([{ type: "add", id: null, ...task }]); setNotice(null); }

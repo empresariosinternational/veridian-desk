@@ -5,7 +5,7 @@ import { aiError, assistantModel, openaiKey } from "@/lib/desk/openai";
 import { planUtterance, validatePlan } from "@/lib/desk/planner";
 import { failSoft, filed, working } from "@/lib/desk/node";
 import { deskPayload, isProfileId, NO_STORE } from "@/lib/desk/payload";
-import { mutate } from "@/lib/desk/store";
+import { openDesk } from "@/lib/desk/store";
 import type { AssistantPlan, HearOutcome, ProfileId } from "@/lib/desk/types";
 
 export const runtime = "nodejs";
@@ -19,6 +19,8 @@ const bodySchema = z.object({
   lang: z.enum(["en", "es", "ht"]).optional(),
   mode: z.enum(["chat", "plan", "file"]).default("file"),
   messages: z.array(z.object({ role: z.enum(["user", "assistant"]), text: z.string().min(1).max(2400) }).strict()).max(12).default([]),
+  /** Client mode only (Vercel): the browser's copy of the desk JSON. */
+  state: z.unknown().optional(),
 }).strict();
 
 /** Browser transcript/text → optional GPT plan → validated filing tools. Audio stays in the browser. */
@@ -31,6 +33,8 @@ export async function POST(req: Request) {
   } catch {
     return Response.json({ ok: false, notice: "Send { text }, a valid mode (chat, plan, file), and up to 12 messages. Voice transcripts come from the browser; audio uploads are not accepted." }, { status: 400, headers: NO_STORE });
   }
+  const desk = openDesk(body.state);
+  const mutate = desk.mutate;
   const hint: ProfileId | undefined = isProfileId(body.profileHint) ? body.profileHint : undefined;
   const { text, lang, source } = body;
   const voice = { via: "" };

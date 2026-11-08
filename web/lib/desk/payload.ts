@@ -3,7 +3,7 @@
 import { deepgramKey, voiceFor } from "./deepgram-voice";
 import { assistantModel, openaiKey } from "./openai";
 import { nodeView } from "./node";
-import { persistenceOk } from "./store";
+import { persistenceOk, stateMode } from "./store";
 import { giveMiamiDay, todayISO } from "./time";
 import type { DeskState, ProfileId } from "./types";
 
@@ -29,7 +29,9 @@ export function deskPayload(state: DeskState, now: Date) {
       },
     },
     assistantReady: { key: Boolean(openaiKey()), model: assistantModel() },
-    persistence: persistenceOk(),
+    /** "client": this browser holds the desk JSON and sends it with each request (Vercel). */
+    mode: stateMode(),
+    persistence: stateMode() === "client" ? true : persistenceOk(),
     today,
     giveMiamiDay: giveMiamiDay(today),
   };

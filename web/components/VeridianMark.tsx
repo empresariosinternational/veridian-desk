@@ -10,7 +10,7 @@ export default function VeridianMark({ size = 16 }: { size?: number }) {
       style={{ flexShrink: 0 }}
     >
       <path d="M2 3h20L12 21.5 2 3Z" fill="var(--veridian)" />
-      <path d="M6.4 5.4h11.2L12 15.8 6.4 5.4Z" fill="var(--veridian-bright)" />
+      <path d="M6.4 5.4h11.2L12 15.8 6.4 5.4Z" fill="var(--veridian-light)" />
       <path d="M9.4 5.4h5.2L12 10.2 9.4 5.4Z" fill="var(--page-bg)" opacity="0.85" />
     </svg>
   );

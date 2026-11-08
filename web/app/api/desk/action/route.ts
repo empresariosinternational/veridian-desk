@@ -1,5 +1,5 @@
 import { deskPayload, isProfileId, NO_STORE } from "@/lib/desk/payload";
-import { mutate, readState, resetState } from "@/lib/desk/store";
+import { openDesk } from "@/lib/desk/store";
 import { checkSentence, rememberPreference, respondToShift } from "@/lib/desk/tools";
 
 export const runtime = "nodejs";
@@ -19,33 +19,34 @@ type Action =
  * - reset           back to the committed seed, for rehearsals
  */
 export async function POST(req: Request) {
-  let a: Action;
+  let a: Action & { state?: unknown };
   try {
     a = await req.json();
   } catch {
     return Response.json({ ok: false, error: "Send JSON with a type." }, { status: 400, headers: NO_STORE });
   }
   const now = new Date();
+  const desk = openDesk(a?.state);
 
   if (a.type === "grant.check") {
-    const state = await readState();
+    const state = await desk.read();
     return Response.json({ ok: true, check: checkSentence(state, String(a.text ?? "")) }, { headers: NO_STORE });
   }
   if (a.type === "reset") {
-    const state = await resetState();
+    const state = await desk.reset();
     return Response.json({ ok: true, say: "Desk reset to the seed.", ...deskPayload(state, now) }, { headers: NO_STORE });
   }
   if (a.type === "shift.respond") {
     if (a.decision !== "accept" && a.decision !== "decline") {
       return Response.json({ ok: false, error: "decision must be accept or decline" }, { status: 400, headers: NO_STORE });
     }
-    const { state, result } = await mutate((s) => respondToShift(s, String(a.recruitId), a.decision, now));
+    const { state, result } = await desk.mutate((s) => respondToShift(s, String(a.recruitId), a.decision, now));
     return Response.json({ ...result, ...deskPayload(state, now) }, { status: result.ok ? 200 : 409, headers: NO_STORE });
   }
   if (a.type === "preference.set") {
     if (!isProfileId(a.profileId)) return Response.json({ ok: false, error: "unknown profile" }, { status: 400, headers: NO_STORE });
     const profileId = a.profileId;
-    const { state, result } = await mutate((s) => rememberPreference(s, profileId, String(a.key), a.value, now));
+    const { state, result } = await desk.mutate((s) => rememberPreference(s, profileId, String(a.key), a.value, now));
     return Response.json({ ...result, ...deskPayload(state, now) }, { status: result.ok ? 200 : 400, headers: NO_STORE });
   }
   return Response.json({ ok: false, error: "unknown action" }, { status: 400, headers: NO_STORE });
