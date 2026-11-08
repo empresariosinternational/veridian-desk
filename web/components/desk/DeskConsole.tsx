@@ -273,6 +273,30 @@ export default function DeskConsole() {
     [active, apply, flash, post, showCards],
   );
 
+  const hearRef = useRef(hear);
+  useEffect(() => { hearRef.current = hear; }, [hear]);
+  const deskReady = data !== null;
+  useEffect(() => {
+    if (!deskReady) return;
+    const BOARD_FOR: Record<string, string> = { marisol: "calls", denise: "donors", yesenia: "workshops", reginald: "notes", owen: "staffing", claudette: "grants", beatriz: "colony", "luis-es": "person" };
+    const onRun = (e: Event) => {
+      const id = (e as CustomEvent<{ id: string }>).detail?.id;
+      const line = SCRIPT.find((l) => l.id === id);
+      if (!line) return;
+      primeSpokenAudio();
+      void hearRef.current({ text: line.text, source: "script" }).then(() => {
+        window.setTimeout(() => {
+          const board = BOARD_FOR[line.id];
+          const el = board ? document.querySelector(`[data-board="${board}"]`) : null;
+          el?.scrollIntoView({ behavior: "smooth", block: window.innerWidth <= 720 ? "start" : "center" });
+        }, 400);
+      });
+    };
+    window.addEventListener("veridian:tour-run", onRun);
+    window.dispatchEvent(new Event("veridian:desk-ready"));
+    return () => window.removeEventListener("veridian:tour-run", onRun);
+  }, [deskReady]);
+
   const nodeEvent = useCallback(
     async (event: "arm" | "disarm" | "presence") => {
       if (event === "disarm") cancelTalk();
