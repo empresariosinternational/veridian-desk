@@ -13,10 +13,8 @@ const uint8_t PIN_TRIG = 7;
 const uint8_t PIN_ECHO = 6;
 const uint8_t PIN_LED = 5;
 const uint8_t SCREEN_HEIGHT = 64;  // Change to 32 for a 128x32 OLED.
-const uint8_t TRIGGER_CM = 20;
-const uint8_t RELEASE_CM = 30;
+const uint8_t TRIGGER_CM = 10;
 const unsigned long SAMPLE_MS = 80;
-const unsigned long RELEASE_MS = 1000;
 const unsigned long HOST_TIMEOUT_MS = 3500;
 
 Adafruit_SSD1306 display(128, SCREEN_HEIGHT, &Wire, -1);
@@ -25,13 +23,9 @@ bool hostConnected = false;
 bool urgent = false;
 bool gestureLatched = false;
 bool gestureTriggered = false;
-bool farPending = false;
-uint8_t nearSamples = 0;
-unsigned long farSince = 0;
 unsigned long lastHost = 0;
 unsigned long lastSample = 0;
 unsigned long lastScreen = 0;
-unsigned long lastTrigger = 0;
 unsigned int distanceCm = 0;
 char status[10] = "OFFLINE";
 char message[45] = "Connect Arduino in /desk";
@@ -92,38 +86,27 @@ void sampleSonar(unsigned long now) {
   const unsigned long duration = pulseIn(PIN_ECHO, HIGH, 25000UL);
   distanceCm = duration ? duration / 58UL : 0;
 
-  if (distanceCm >= 2 && distanceCm <= TRIGGER_CM) {
-    farPending = false;
-    if (nearSamples < 3) nearSamples++;
-    if (nearSamples == 3 && !gestureLatched) {
+  // Compare the raw echo so a reading just above 10 cm cannot round down
+  // to 10 cm and keep the microphone open. A missing echo releases capture.
+  const bool near = duration > 0 && duration <= TRIGGER_CM * 58UL;
+  if (near) {
+    if (!gestureLatched) {
       // Latch even while disarmed: arming with a hand already present must
       // not start recording. Move away, then make a new gesture.
       gestureLatched = true;
-      if (hostConnected && strcmp_P(status, PSTR("ARMED")) == 0 &&
-          (lastTrigger == 0 || now - lastTrigger >= 1500)) {
-        lastTrigger = now;
+      if (hostConnected && strcmp_P(status, PSTR("ARMED")) == 0) {
         gestureTriggered = true;
         Serial.println(F("{\"event\":\"sonar\"}"));
       }
     }
   } else {
-    nearSamples = 0;
-    // Keep sampling and servicing USB while timing one continuous second away.
-    if (distanceCm == 0 || distanceCm >= RELEASE_CM) {
-      if (!farPending) {
-        farPending = true;
-        farSince = now;
-      }
-      if (gestureLatched && now - farSince >= RELEASE_MS) {
-        gestureLatched = false;
-        // Release must reach the browser even before its LISTENING update
-        // arrives (for example, while microphone permission is pending).
-        if (gestureTriggered) {
-          gestureTriggered = false;
-          if (hostConnected) Serial.println(F("{\"event\":\"sonar-release\"}"));
-        }
-      }
-    } else farPending = false;
+    gestureLatched = false;
+    // Release on the first far reading, even before the browser's LISTENING
+    // update arrives (for example, while microphone permission is pending).
+    if (gestureTriggered) {
+      gestureTriggered = false;
+      if (hostConnected) Serial.println(F("{\"event\":\"sonar-release\"}"));
+    }
   }
 }
 

@@ -68,18 +68,21 @@ const std::string START = "{\"event\":\"sonar\"}";
 const std::string RELEASE = "{\"event\":\"sonar-release\"}";
 
 void reset(const char *state = "ARMED") {
-  fakeTime = fakeEcho = lastSample = lastTrigger = farSince = 0;
-  nearSamples = 0;
-  gestureLatched = gestureTriggered = farPending = false;
+  fakeTime = fakeEcho = lastSample = 0;
+  gestureLatched = gestureTriggered = false;
   hostConnected = true;
   strcpy(status, state);
   Serial.events.clear();
 }
 
-void sample(unsigned int cm, unsigned long elapsed = SAMPLE_MS) {
-  fakeEcho = cm * 58UL;
+void sampleEcho(unsigned long duration, unsigned long elapsed = SAMPLE_MS) {
+  fakeEcho = duration;
   fakeTime += elapsed;
   sampleSonar(fakeTime);
+}
+
+void sample(unsigned int cm, unsigned long elapsed = SAMPLE_MS) {
+  sampleEcho(cm * 58UL, elapsed);
 }
 
 void readings(unsigned int cm, int count) {
@@ -87,79 +90,72 @@ void readings(unsigned int cm, int count) {
 }
 
 int main() {
-  // Near starts capture; keeping the hand near for ten seconds never releases it.
+  // A single reading at exactly 10 cm starts; long holds never auto-release.
   reset();
-  readings(10, 2);
-  assert(Serial.events.empty());
   sample(10);
   assert(Serial.events == std::vector<std::string>{START});
   strcpy(status, "LISTENING");
   readings(10, 125);
   assert(Serial.events.size() == 1);
 
-  // One full second of far readings, independent of the number of samples.
-  sample(35);
-  sample(35, 920);
-  assert(Serial.events.size() == 1);
-  sample(35);
+  // The very first reading above 10 cm releases, without a debounce delay.
+  sample(11);
   assert(Serial.events == (std::vector<std::string>{START, RELEASE}));
-  readings(35, 20);
+  readings(11, 20);
   assert(Serial.events.size() == 2);
 
-  // A normal 80 ms sampling cadence releases at the first sample after 1 s.
+  // Values just above 10 cm must not round down; re-entry has no cooldown.
   reset();
-  readings(10, 3);
-  readings(30, 13);
-  assert(Serial.events.size() == 1);
-  sample(30);
-  assert(Serial.events == (std::vector<std::string>{START, RELEASE}));
-
-  // Brief movement away and intermediate readings reset the full-second timer.
-  reset();
-  readings(10, 3);
-  readings(35, 10);
+  sample(11);
+  assert(Serial.events.empty());
   sample(10);
-  readings(35, 10);
-  sample(25);
-  readings(0, 13);
-  assert(Serial.events.size() == 1);
+  sampleEcho(581); // 10 cm is 580 microseconds; this is slightly farther.
+  assert(Serial.events == (std::vector<std::string>{START, RELEASE}));
+  sample(10);
+  assert(Serial.events == (std::vector<std::string>{START, RELEASE, START}));
+
+  // Short valid distances count as near; losing the echo stops immediately.
+  reset();
+  sample(0);
+  assert(Serial.events.empty());
+  sample(1);
+  assert(Serial.events == std::vector<std::string>{START});
   sample(0);
   assert(Serial.events == (std::vector<std::string>{START, RELEASE}));
 
   // Release must reach a pending microphone prompt before LISTENING arrives.
   reset();
-  readings(10, 3);
-  readings(35, 14);
+  sample(10);
+  sample(11);
   assert(strcmp(status, "ARMED") == 0);
   assert(Serial.events == (std::vector<std::string>{START, RELEASE}));
 
   // Pre-existing hands and disarmed/offline gestures cannot open the mic.
   reset("IDLE");
-  readings(10, 3);
+  sample(10);
   strcpy(status, "ARMED");
   readings(10, 10);
-  readings(35, 14);
+  sample(11);
   assert(Serial.events.empty());
-  readings(10, 3);
+  sample(10);
   assert(Serial.events == std::vector<std::string>{START});
   reset();
   hostConnected = false;
-  readings(10, 3);
-  readings(35, 14);
+  sample(10);
+  sample(11);
   assert(Serial.events.empty());
 
-  // Elapsed-time subtraction continues to work when millis() wraps around.
+  // The sampling cadence continues to work when millis() wraps around.
   reset();
-  readings(10, 3);
-  fakeTime = ULONG_MAX - 500;
-  lastSample = fakeTime - SAMPLE_MS;
-  readings(35, 13);
-  assert(Serial.events.size() == 1);
-  sample(35);
+  sample(10);
+  fakeTime = ULONG_MAX - SAMPLE_MS / 2;
+  lastSample = fakeTime;
+  sample(11);
   assert(Serial.events == (std::vector<std::string>{START, RELEASE}));
 
-  std::cout << "Sonar firmware checks passed: near trigger, long hold, one-second "
-               "release, noise reset, permission prompt, consent, offline, clock rollover.\n";
+  std::cout << "Sonar firmware checks passed: 10 cm boundary, immediate release, "
+               "fractional readings, long hold, re-entry, no echo, permission prompt, "
+               "consent, offline, clock rollover.\n";
 }
 """
 
