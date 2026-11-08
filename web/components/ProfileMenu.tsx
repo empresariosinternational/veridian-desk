@@ -85,7 +85,9 @@ export default function ProfileMenu() {
           aria-expanded={open}
           onClick={() => setOpen((v) => !v)}
         >
-          ▾
+          <svg className="profile-tab-chevron-icon" viewBox="0 0 16 16" aria-hidden="true">
+            <path d="M3.25 6.1 8 10.85 12.75 6.1" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
         </button>
       </div>
 
